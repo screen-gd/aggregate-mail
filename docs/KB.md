@@ -3442,3 +3442,6 @@ Notification widths and heights follow enabled text and actions, with inline
 Undo on short confirmations. Existing privacy, focus, expiry and error behavior
 remain covered by `src/toasts.test.tsx`; row and selection contracts are covered
 by `src/row-actions.test.tsx`, `src/list-windowing.test.tsx` and `src/bulk-mail.test.tsx`.
+`src/message-style.test.tsx` renders MailList with its virtual-row wrappers and
+the complete stylesheet cascade. It checks the 34px selection gutter in both
+densities and list widths, with checkboxes absent, unchecked and checked.

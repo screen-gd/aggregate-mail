@@ -7,6 +7,9 @@ import { MessageText } from "./mail/MessageContent";
 import { FormattedMail } from "./mail/FormattedMail";
 import { AppearanceSettings } from "./settings/AppearanceSettings";
 import { defaultAppearance } from "./appearance";
+import type { Mail } from "../shared/types";
+import { MailList } from "./mail/MailList";
+import { BulkSelectionContext, selectionKey } from "./mail/bulk-selection";
 
 // The stylesheet entry imports one file per area; jsdom does not follow @import.
 const stylesheet = () => readFileSync(new URL("./style.css", import.meta.url), "utf8")
@@ -23,11 +26,31 @@ test("opaque sticky date captions cover the rows scrolling beneath them", () => 
   } finally { dom.window.close(); }
 });
 
-test("compact card checkboxes keep their gutter after the complete stylesheet cascade", () => {
-  const dom = new JSDOM('<div class="compact"><div class="mail-row"><button class="mail-select"></button><button class="row card"></button></div></div>');
+test("rendered mail rows keep their gutter across checkbox states after the complete stylesheet cascade", () => {
+  const mail: Mail = { id: "a:1", accountId: "a", remoteId: "1", sender: "Team", address: "sender@example.com",
+    to: "reader@example.com", subject: "Work", preview: "Preview", body: "", date: 1, unread: true,
+    category: "important", relevance: 2, reason: "", archived: false, snoozedUntil: null };
+  const dom = new JSDOM("<!doctype html>");
   try {
     dom.window.document.head.insertAdjacentHTML("beforeend", `<style>${stylesheet()}</style>`);
-    assert.equal(dom.window.getComputedStyle(dom.window.document.querySelector(".row")!).paddingLeft, "30px");
+    for (const density of ["compact", "comfortable"] as const) for (const narrow of [false, true]) {
+      for (const state of ["absent", "unchecked", "checked"] as const) {
+        const selected = new Set(state === "checked" ? [selectionKey(mail)] : []);
+        dom.window.document.body.innerHTML = renderToStaticMarkup(<div className={`list ${density}`}>
+          <BulkSelectionContext.Provider value={state === "absent" ? null : { selected, disabled: false, toggle: () => {} }}>
+            <MailList messages={[mail]} selectedId={undefined} density={density} narrow={narrow} sort="newest"
+              opening="double" accounts={[]} listRef={{ current: null }} focusSelection={false}
+              onOpen={() => {}} onSelect={() => {}} onMenu={() => {}} onMenuKey={() => {}} />
+          </BulkSelectionContext.Provider>
+        </div>);
+        const context = `${density}, narrow=${narrow}, checkbox=${state}`;
+        const row = dom.window.document.querySelector(".mail-window-row > .mail-row > .row")!;
+        const checkbox = dom.window.document.querySelector(".mail-select");
+        assert.ok(row, context);
+        assert.equal(checkbox?.getAttribute("aria-checked"), state === "absent" ? undefined : String(state === "checked"), context);
+        assert.equal(dom.window.getComputedStyle(row).paddingLeft, "34px", context);
+      }
+    }
   } finally { dom.window.close(); }
 });
 
