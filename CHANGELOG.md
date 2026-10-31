@@ -27,6 +27,8 @@ unversioned history without treating it as a release record.
 
 ### Fixed
 
+- Load the phone sign-in and pairing controls when the browser app is installed beneath a hidden directory.
+
 - Delete saved drafts without waiting for a full mail-cache scan. Unused attachments still count toward storage limits until cleanup, normally during the daily idle inventory; compact storage to reclaim them sooner. ([#180](https://github.com/collection-of-things/aggregate-mail/issues/180))
 - Keep the marketing site's feature demo windows inside their panel on phones instead of cutting off the left edge, and lighten the site's rendering: paintings render at no more than one device pixel, stay still on touch screens and narrow windows, and the canvases no longer keep a copy of each frame. ([#190](https://github.com/collection-of-things/aggregate-mail/pull/190))
 
