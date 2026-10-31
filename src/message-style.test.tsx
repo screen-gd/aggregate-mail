@@ -49,6 +49,11 @@ test("rendered mail rows keep their gutter across checkbox states after the comp
         assert.ok(row, context);
         assert.equal(checkbox?.getAttribute("aria-checked"), state === "absent" ? undefined : String(state === "checked"), context);
         assert.equal(dom.window.getComputedStyle(row).paddingLeft, "34px", context);
+        if (checkbox) {
+          const style = dom.window.getComputedStyle(checkbox);
+          assert.equal(style.position, "absolute", context);
+          assert.equal(style.left, "10px", context);
+        }
       }
     }
   } finally { dom.window.close(); }

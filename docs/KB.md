@@ -3444,4 +3444,5 @@ remain covered by `src/toasts.test.tsx`; row and selection contracts are covered
 by `src/row-actions.test.tsx`, `src/list-windowing.test.tsx` and `src/bulk-mail.test.tsx`.
 `src/message-style.test.tsx` renders MailList with its virtual-row wrappers and
 the complete stylesheet cascade. It checks the 34px selection gutter in both
-densities and list widths, with checkboxes absent, unchecked and checked.
+densities and list widths, with checkboxes absent, unchecked and checked. Present
+checkboxes must retain absolute positioning at a 10px left offset.
