@@ -182,7 +182,7 @@ export function Sidebar({
         </div>
           <div className="sidebar-account-footer">
             <button type="button" className="sidebar-account-card" disabled={mail.blocked}
-              aria-label={`Manage accounts, ${footerLabel}`} onClick={() => mail.onAccountSettings(selectedAccount?.id)}>
+              aria-label={`Manage accounts, ${footerLabel}${mail.accounts.length ? "" : ", Connect an account"}`} onClick={() => mail.onAccountSettings(selectedAccount?.id)}>
               <span className="sidebar-account-avatar" aria-hidden="true">
                 {selectedAccount ? <ProviderIcon provider={selectedAccount.provider} /> : <MailIcon size={18} />}
               </span>

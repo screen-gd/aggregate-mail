@@ -927,7 +927,7 @@ test("calendar creates an Emc² event, shows it in the grid and day list, and ed
   assert.ok(detail()!.textContent!.includes("one@example.test")&&detail()!.textContent!.includes("Room 4")&&detail()!.textContent!.includes("Bring the numbers"));
   assert.ok(ui.container.textContent?.includes("Event added to your Emc² calendar."));
   const cell=ui.container.querySelector<HTMLButtonElement>(`button[aria-label="${day}, 1 scheduled"]`)!;
-  assert.ok(cell.querySelector(".calendar-chip")?.textContent?.includes("Design review"));assert.equal(cell.querySelector(".calendar-chips")?.getAttribute("aria-hidden"),"true");
+  assert.equal(cell.querySelector(".calendar-chip")?.textContent, "Design review", "compact previews start with the event title; time stays in the day list");assert.equal(cell.querySelector(".calendar-chips")?.getAttribute("aria-hidden"),"true");
   await act(async()=>detail()!.dispatchEvent(new ui.dom.window.KeyboardEvent("keydown",{key:"Escape",bubbles:true})));assert.equal(detail(),null,"Escape closes the event pane");
   await ui.click(cell);const row=ui.container.querySelector<HTMLButtonElement>(".calendar-agenda .calendar-event")!;assert.ok(row.textContent?.includes("Event"));
   await ui.click(row);assert.equal(row.getAttribute("aria-pressed"),"true");

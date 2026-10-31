@@ -191,9 +191,10 @@ inputs. No operating-system reminders in V2.
 
 Emc² events share the grid, day list and agenda. The month navigator uses a
 296px column beside a wider event list, with 48px minimum day cells and one
-event preview (time and title; "Event" in privacy mode). Each date shows its
-total scheduled count; selecting it reveals every entry. The event list uses
-15px titles, 12px metadata and 76px minimum rows. At 660px or less of calendar
+title-only event preview of at most two lines ("Event" in privacy mode). Times
+stay in the day list.
+Each date shows its total scheduled count; selecting it reveals every entry.
+The event list uses 15px titles, 12px metadata and 76px minimum rows. At 660px or less of calendar
 content width, the month stacks above the event list. Coarse pointers get a
 336px month column when space permits. New event sits in the calendar toolbar;
 Schedule meeting sits in the

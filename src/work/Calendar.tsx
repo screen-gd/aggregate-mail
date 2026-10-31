@@ -121,7 +121,7 @@ export function Calendar({ items, messages = [], events = [], now, selectedEvent
           return <button type="button" key={value} aria-label={`${value}, ${count} scheduled`} aria-pressed={day === value} aria-current={value === today ? "date" : undefined} onClick={() => setDay(value)}>
             <span className="calendar-day-heading"><span>{index + 1}</span>{count > 0 && <small aria-hidden="true">{count}</small>}</span>
             {meetings.length > 0 && <span className="calendar-chips" aria-hidden="true">{meetings.slice(0, 1).map((entry) => <span className="calendar-chip" key={entry.item.id}>
-              {entry.item.allDay ? "" : `${shortTime(Date.parse(entry.item.start))} `}{privacy ? entry.item.workSession ? "Work session" : "Event" : `${entry.item.workSession ? "Work session: " : ""}${entry.item.title}`}</span>)}
+              {privacy ? entry.item.workSession ? "Work session" : "Event" : entry.item.title}</span>)}
             </span>}
           </button>;
         })}

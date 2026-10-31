@@ -190,7 +190,7 @@ section.work-calendar[data-layout="month"], .work-layout.has-selection section.w
 .calendar-grid [aria-current="date"] > span.calendar-day-heading { display: flex; justify-content: space-between; min-width: 0; min-height: 0; border-radius: 0; background: none; color: var(--accent); }
 .calendar-day-heading small { padding-inline: 2px; border-radius: 3px; background: var(--selected); color: var(--text-3); font-size: calc(9px * var(--text-scale, 1)); font-weight: 600; }
 .calendar-chips { margin-top: auto; }
-.calendar-chip { padding: 1px 2px; font-size: calc(10px * var(--text-scale, 1)); }
+.calendar-chip { padding: 1px 2px; font-size: calc(10px * var(--text-scale, 1)); white-space: normal; overflow-wrap: anywhere; line-height: 1.2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 section.work-calendar[data-layout="month"] > .calendar-day-title { margin: 10px 0 16px; font-size: calc(16px * var(--text-scale, 1)); }
 .calendar-agenda button { gap: 8px; min-height: 76px; padding: 14px 16px; margin-bottom: 12px; }
 .calendar-agenda strong { font-size: calc(15px * var(--text-scale, 1)); line-height: 1.45; }

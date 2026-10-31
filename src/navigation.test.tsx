@@ -1075,6 +1075,7 @@ test("the rebuild footer opens Accounts with no connected accounts", async () =>
   try {
     const footer = app.container.querySelector<HTMLButtonElement>(".sidebar-account-card")!;
     assert.match(footer.textContent!, /Connect an account/);
+    assert.match(footer.getAttribute("aria-label") || "", /Connect an account/);
     await app.click(footer);
     assert.equal(app.button("Accounts").getAttribute("aria-current"), "page");
     assert.equal(app.mutations.length, 0);
