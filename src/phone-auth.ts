@@ -19,8 +19,10 @@ const failed = () => { if (connect) connect.hidden = false; if (register) regist
 const showClaim = (value: { code: string; approved: boolean }) => {
   if (connect) connect.hidden = true;
   const code = document.getElementById("pair-code");
-  if (code) code.textContent = `Matching code: ${value.code}`;
-  if (value.approved) { message("Host approved. Save a passkey using your phone's screen lock."); if (register) register.disabled = false; }
+  if (code) { code.textContent = value.approved ? "" : `Matching code: ${value.code}`; code.hidden = value.approved; }
+  const steps = document.getElementById("pair-steps");
+  if (steps) steps.hidden = value.approved;
+  if (value.approved) { message("Ready to connect. Save a passkey using your phone's screen lock."); if (register) register.disabled = false; }
   else message("Compare this code with the host, then approve it there.");
 };
 const poll = async () => {

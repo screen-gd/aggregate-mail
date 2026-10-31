@@ -7,7 +7,7 @@ import { JSDOM } from "jsdom";
 const bundle = (await build({ entryPoints: [fileURLToPath(new URL("../src/phone-auth.ts", import.meta.url))], bundle: true, platform: "browser", target: "es2022", minify: true, write: false })).outputFiles[0].text;
 test("pairing client clears the fragment before its first request and sends it only in the POST body", async () => {
   const token = "a".repeat(43);
-  const dom = new JSDOM('<p id="passkey-status"></p><p id="pair-code"></p><button id="passkey-register" disabled></button>', { url: `https://mail.synthetic-tailnet.ts.net:8444/auth/pair#${token}`, runScripts: "outside-only" });
+  const dom = new JSDOM('<p id="passkey-status"></p><p id="pair-code"></p><ol id="pair-steps"><li>Compare on host</li></ol><button id="passkey-register" disabled></button>', { url: `https://mail.synthetic-tailnet.ts.net:8444/auth/pair#${token}`, runScripts: "outside-only" });
   const calls = [];
   dom.window.AbortSignal.timeout = () => new AbortController().signal;
   dom.window.fetch = async (url, options) => {
@@ -20,7 +20,8 @@ test("pairing client clears the fragment before its first request and sends it o
     dom.window.eval(bundle);
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(calls[0], { url: "/auth/passkey/pair", body: { token } });
-    assert.match(dom.window.document.getElementById("pair-code").textContent, /123456/);
+    assert.equal(dom.window.document.getElementById("pair-code").hidden, true);
+    assert.equal(dom.window.document.getElementById("pair-steps").hidden, true);
     assert.equal(dom.window.document.getElementById("passkey-register").disabled, false);
     assert.ok(!dom.window.document.body.innerHTML.includes(token));
   } finally { dom.window.close(); }
@@ -37,7 +38,7 @@ test("invalid invitations do not make requests or offer registration", () => {
 });
 
 test("phone-initiated setup recovers an expired page and waits for host approval", async () => {
-  const dom = new JSDOM('<p id="passkey-status"></p><p id="pair-code"></p><button id="passkey-connect" hidden></button><button id="passkey-register" disabled></button>', {url:"https://mail.synthetic-tailnet.ts.net:8444/auth/pair",runScripts:"outside-only"});
+  const dom = new JSDOM('<p id="passkey-status"></p><p id="pair-code"></p><ol id="pair-steps"><li>Compare on host</li></ol><button id="passkey-connect" hidden></button><button id="passkey-register" disabled></button>', {url:"https://mail.synthetic-tailnet.ts.net:8444/auth/pair",runScripts:"outside-only"});
   const calls=[]; let requested=false;
   dom.window.AbortSignal.timeout=()=>new AbortController().signal;
   dom.window.fetch=async (url)=>{
@@ -52,7 +53,7 @@ test("phone-initiated setup recovers an expired page and waits for host approval
     connect.click();await new Promise(resolve=>setImmediate(resolve));
     assert.ok(calls.includes("/auth/passkey/request"));
     assert.equal(connect.hidden,true);
-    assert.match(dom.window.document.getElementById("pair-code").textContent,/654321/);
+    assert.equal(dom.window.document.getElementById("pair-code").hidden,true);
     assert.equal(dom.window.document.getElementById("passkey-register").disabled,false);
   } finally {dom.window.close();}
 });

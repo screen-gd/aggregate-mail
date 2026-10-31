@@ -1,4 +1,4 @@
-import { useContext, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
+import { useCallback, useContext, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
 import type { Account, RendererMail as Mail } from "../../shared/types";
 import { previewText } from "../../shared/mail-content";
 import type { InteractionPreferences } from "../interaction";
@@ -48,12 +48,16 @@ export function MailList<T extends Mail>({
   actions?: (mail: T) => RowAction[];
 }) {
   const cardLayout = narrow || density === "comfortable";
+  const cardContent = useCallback((mail: T) => ({
+    metadata: showAccount || !!(mail.relevance === 3 && mail.reason),
+    preview: density === "comfortable" && !!previewText(mail.preview).trim(),
+  }), [showAccount, density]);
   const bulk = useContext(BulkSelectionContext);
   const { on: privacy } = useContext(PrivacyContext);
   return <>
     {showAccount && !cardLayout && <div className="mail-list-columns" aria-hidden="true"><span>Account</span><span>Status</span></div>}
     <MailListWindow messages={messages} selectedId={selectedId} focusSelection={focusSelection}
-    density={density} sort={sort} listRef={listRef} narrow={cardLayout}>{(m, index) => {
+    density={density} sort={sort} listRef={listRef} narrow={cardLayout} cardContent={cardContent}>{(m, index) => {
     const relevance = m.relevance;
     const layout: RowLayout = cardLayout ? "card" : "inline";
     const current = m.id === selectedId;
@@ -110,7 +114,7 @@ export function MailList<T extends Mail>({
                 </span>
                 {metadata}
                 <span className="row-subject"><Redact text={m.subject || "(no subject)"} /></span>
-                {density === "comfortable" && (
+                {cardContent(m).preview && (
                   <span className="row-preview"><Redact text={previewText(m.preview)} /></span>
                 )}
               </span>

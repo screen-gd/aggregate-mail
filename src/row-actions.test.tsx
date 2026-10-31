@@ -106,7 +106,7 @@ test('touch and narrow lists do not reserve a persistent action strip', async ()
  for (const narrow of [false, true]) for (const density of ['comfortable', 'compact'] as const) {
   const ui = await mountRows([mail, {...mail, id: 'b:1'}], {touch: true, narrow, density});
   try {
-   const height = density === 'compact' ? narrow ? 72 : 24 : 100;
+   const height = density === 'compact' && !narrow ? 24 : 54;
    assert.equal(document.querySelectorAll('.with-action-strip').length, 0);
    assert.equal(parseFloat(ui.rows()[1].style.top), height);
    assert.equal(parseFloat(document.querySelector<HTMLElement>('.mail-window')!.style.height), height * 2);
@@ -119,7 +119,7 @@ test('the rendered row layout and the windowing height agree in every density an
    const rows=ui.rows();
    const heights=rows.map((row,index)=>index+1<rows.length?parseFloat(ui.rows()[index+1].style.top)-parseFloat(row.style.top):0);
    const expectedClass=narrow||density==='comfortable'?'card':'inline';
-   const expectedHeight=density==='compact'?(narrow?72:24):100;
+   const expectedHeight=density==='compact'&&!narrow?24:54;
    for(const[index,row]of rows.entries()){
     const button=row.querySelector<HTMLElement>('.row')!;
     const relevance=index===0?2:index===1?3:1;
@@ -152,4 +152,22 @@ for (const archived of [false, true]) test(`row shows only applicable actions in
  const labels = [...html.matchAll(/aria-label="([^"]+)"/g)].map((match) => match[1]).filter((label) => label !== 'Email actions' && label !== 'More actions');
  assert.equal(labels.length, 7, 'one read-state action plus six applicable actions');
  assert.deepEqual(labels.slice(-6), [archived ? 'Move to Inbox' : 'Archive', 'Snooze', 'Move to Trash', 'Reply', 'Mark as read', 'Pin email']);
+});
+
+
+test('card geometry follows enabled metadata, preview, density and text size', async () => {
+ const ui = await mountRows([mail, {...mail, id: 'b:1', preview: 'A preview'}, {...mail, id: 'c:1', relevance: 3, reason: 'Needs reply'}]);
+ const heights = () => ui.rows().map(row => parseFloat(row.style.height));
+ try {
+  assert.deepEqual(heights(), [54, 74, 72]);
+  assert.equal(ui.rows()[0].querySelector('.row-preview'), null, 'empty previews reserve no line');
+  await ui.render({showAccount: true});
+  assert.deepEqual(heights(), [72, 92, 72]);
+  await ui.render({density: 'compact', narrow: true, showAccount: false});
+  assert.deepEqual(heights(), [54, 54, 72]);
+  ui.ref.current!.style.setProperty('--text-scale', '1.5');
+  await ui.render({showAccount: false});
+  assert.deepEqual(heights(), [81, 111, 108]);
+  assert.deepEqual(ui.rows().map(row => parseFloat(row.style.top)), [0, 81, 192]);
+ } finally { await ui.close(); }
 });

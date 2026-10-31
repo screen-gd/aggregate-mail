@@ -72,6 +72,16 @@ separate acceptance.
 
 ## Phone pairing, passkeys and browser key bootstrap
 
+`npm run phone:link` creates a two-minute, one-use headless setup link using
+local recovery authentication and the normal API CSRF guard. `setup-link`
+stores authorization only on the server invitation and consumes it at claim.
+It never trusts client approval fields. Ordinary QR and phone-initiated requests
+still need matching-code approval. User-verified WebAuthn, claim expiry and
+route-lifetime checks remain mandatory. The CLI follows no redirects, accepts
+only the known login/logout 303 destinations, bounds responses and deadlines,
+and attempts logout after acquiring its temporary session. See
+[ADR 0112](adr/0112-headless-phone-setup.md).
+
 `server/phone-passkeys.ts` mounts only the public `/auth/pair`, bundled client
 and named pairing/WebAuthn POST routes before session authentication. Gate
 Host/Origin checks apply first; remote POSTs require the exact verified origin.
@@ -792,7 +802,7 @@ account column for a selected account. Labels reuse `accountLabel`, including
 duplicate names, privacy redaction and unavailable-account fallback; row
 accessible names include the permitted account and status. Account dots match
 sidebar order and repeat after four accounts. Narrow rows put metadata below
-the sender. The compact narrow height is 72px in both CSS tokens and windowing
+the sender. Narrow card heights include only enabled metadata and nonempty previews in windowing
 fallbacks. Sender avatars omit provider overlays. Status visibility follows
 message importance; only May need labels take the existing reason colour.
 
@@ -2786,8 +2796,9 @@ etched separators, inset list cards and document panels apply across Mail, Draft
 Agent review, Calendar, Contacts and Settings.
 
 Comfortable MailList uses its card layout at every width and passes that same
-choice to MailListWindow: 100px before text scaling. Compact keeps 24px wide or
-72px beside the reader. Row controls, bulk selection, scrolling, focus, account
+choice to MailListWindow. Card heights use a 54px sender/subject base, 18px for
+visible metadata and 20px for nonempty comfortable previews, all text-scaled.
+Compact wide rows stay 24px; compact cards omit previews. Row controls, bulk selection, scrolling, focus, account
 identity and all current handlers remain shared. The list uses the existing
 measured card tokens rather than changing heights only in CSS. Date headings
 cover scrolling rows outside glass mode; compact bulk cards keep the checkbox
@@ -3041,8 +3052,8 @@ It shares App's density state with Commands and the configured density shortcut.
 Explicit changes save `emc2.density` on this device; startup reads the saved value
 without writing it. A failed save keeps the session value and shows a notice.
 Density changes spacing independently of text scale.
-The virtual list retains existing wide and narrow row-height tokens, including
-72px compact cards. Density and text-scale changes scroll the selected row into
+The virtual list retains 24px compact wide rows and computes narrow card
+heights from visible metadata and preview content. Density and text-scale changes scroll the selected row into
 view without taking focus from Settings or editors. Passive scrolling and mail
 refreshes retain their existing behavior. Synthetic coverage is in
 `src/list-windowing.test.tsx` and the persistent-density case in
@@ -3413,3 +3424,16 @@ invalidates that confirmation. Restored drafts retain text and attachments but
 lose invitation and calendar-context authority; prepare calendar drafts again
 from the current event or source before sending calendar data. See
 [ADR 0110](adr/0110-reviewed-unverified-calendar-imports.md).
+
+### Content-driven interface spacing
+
+MailList supplies visible metadata and preview flags to MailListWindow, which
+assigns each rendered slot its calculated height. CSS fills that slot; the same
+selection gutter remains when checkboxes are absent. Bulk selection memoizes its
+identity index per immutable message array and keeps sync status beside the
+selected count. Sync continues to block provider actions, not local selection.
+Today task rows, Projects, drafts and Settings use compact natural spacing.
+Notification widths and heights follow enabled text and actions, with inline
+Undo on short confirmations. Existing privacy, focus, expiry and error behavior
+remain covered by `src/toasts.test.tsx`; row and selection contracts are covered
+by `src/row-actions.test.tsx`, `src/list-windowing.test.tsx` and `src/bulk-mail.test.tsx`.

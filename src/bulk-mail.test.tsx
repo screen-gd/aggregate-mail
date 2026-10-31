@@ -262,3 +262,19 @@ test("a 200-item range outside the first batch reads mixed, and the master then 
     assert.equal(ui.master().getAttribute("aria-checked"), "true", "the master selects the first 200");
   } finally { await ui.close(); }
 });
+
+
+test("checkbox toggles do not rescan an unchanged large mailbox", async () => {
+  const ui = await mount();
+  let reads = 0;
+  const large = Array.from({ length: 20_000 }, (_, index) => ({ ...messages[0],
+    get id() { reads++; return `large-${index}`; },
+  }));
+  try {
+    await ui.render(large);
+    reads = 0;
+    await act(async () => document.querySelector<HTMLButtonElement>('.mail-row [role="checkbox"]')!.click());
+    assert.match(ui.count()!, /^1 messages selected/);
+    assert.ok(reads < 1_000, `a local toggle read ${reads} message identities`);
+  } finally { await ui.close(); }
+});

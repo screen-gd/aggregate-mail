@@ -3,7 +3,7 @@ import type { RendererMail as Mail } from "../shared/types";
 import type { MailLocation } from "./navigation";
 import { dayGroup } from "./mail/format";
 
-export function MailListWindow<T extends Mail>({ messages, selectedId, focusSelection, density, sort, listRef, narrow = false, children }: {
+export function MailListWindow<T extends Mail>({ messages, selectedId, focusSelection, density, sort, listRef, narrow = false, cardContent, children }: {
   messages: T[];
   selectedId: string | undefined;
   focusSelection: boolean;
@@ -11,11 +11,12 @@ export function MailListWindow<T extends Mail>({ messages, selectedId, focusSele
   sort: MailLocation["sort"];
   listRef: RefObject<HTMLElement | null>;
   narrow?: boolean;
+  cardContent?: (mail: T) => { metadata: boolean; preview: boolean };
   children: (mail: T, index: number) => ReactNode;
 }) {
   const windowRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ top: 0, height: 600, offset: 0 });
-  const [sizes, setSizes] = useState({ medium: 34, compact: 24, group: 30 });
+  const [sizes, setSizes] = useState({ medium: 34, compact: 24, group: 30, cardBase: 54, metadata: 18, preview: 20 });
   const [measured, setMeasured] = useState(false);
   const geometry = useMemo(() => {
     let height = 0;
@@ -28,12 +29,14 @@ export function MailListWindow<T extends Mail>({ messages, selectedId, focusSele
         height += sizes.group;
       }
       const top = height;
-      height += density === "compact" ? sizes.compact : sizes.medium;
+      const content = narrow && cardContent?.(mail);
+      height += content ? sizes.cardBase + (content.metadata ? sizes.metadata : 0) + (content.preview ? sizes.preview : 0)
+        : density === "compact" ? sizes.compact : sizes.medium;
       return { top, bottom: height };
     });
     if (groups.length) groups[groups.length - 1].height = height - groups[groups.length - 1].top;
     return { rows, groups, height };
-  }, [messages, density, sort, sizes]);
+  }, [messages, density, sort, sizes, narrow, cardContent]);
   const windowOffset = useCallback(() => {
     let offset = 0;
     let element: HTMLElement | null = windowRef.current;
@@ -53,6 +56,9 @@ export function MailListWindow<T extends Mail>({ messages, selectedId, focusSele
     const nextSizes = {
       medium: token("medium", narrow ? 100 : 34),
       compact: token("compact", narrow ? 72 : 24),
+      cardBase: (parseFloat(style.getPropertyValue("--mail-card-base")) || 54) * scale,
+      metadata: (parseFloat(style.getPropertyValue("--mail-card-meta")) || 18) * scale,
+      preview: (parseFloat(style.getPropertyValue("--mail-card-preview")) || 20) * scale,
       group: (parseFloat(style.getPropertyValue("--mail-group-height")) || 30) * scale,
     };
     setSizes(current => Object.keys(current).every(key => current[key as keyof typeof current] === nextSizes[key as keyof typeof nextSizes]) ? current : nextSizes);
@@ -85,7 +91,7 @@ export function MailListWindow<T extends Mail>({ messages, selectedId, focusSele
     const list = listRef.current;
     if (!list || !measured) return;
     if (selectedIndex < 0) { lastSelection.current = undefined; return; }
-    const layout = JSON.stringify([density, narrow, sizes]);
+    const layout = JSON.stringify([density, narrow, sizes, geometry.rows[selectedIndex]?.bottom - geometry.rows[selectedIndex]?.top]);
     const selectionChanged = lastSelection.current !== selectedId;
     const layoutChanged = lastLayout.current !== layout;
     // Density and text sizing keep selection visible; refresh and passive scroll do not snap it back.
@@ -131,6 +137,6 @@ export function MailListWindow<T extends Mail>({ messages, selectedId, focusSele
     {geometry.groups.map((group, index) => <div key={index} className="mail-window-date"
       style={{ top: group.top, height: group.height }}><h3 className="group">{group.label}</h3></div>)}
     {indices.map(index => <div className="mail-window-row" key={messages[index].id} data-mail-id={messages[index].id}
-      style={{ top: geometry.rows[index].top }}>{children(messages[index], index)}</div>)}
+      style={{ top: geometry.rows[index].top, height: geometry.rows[index].bottom - geometry.rows[index].top }}>{children(messages[index], index)}</div>)}
   </div>;
 }

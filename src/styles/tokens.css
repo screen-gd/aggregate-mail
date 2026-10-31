@@ -10,6 +10,9 @@
   --mail-row-compact: 24px;
   --mail-row-card-medium: 100px;
   --mail-row-card-compact: 72px;
+  --mail-card-base: 54px;
+  --mail-card-meta: 18px;
+  --mail-card-preview: 20px;
   --account-color-0: #5487d9;
   --account-color-1: #419b91;
   --account-color-2: #a18ac9;

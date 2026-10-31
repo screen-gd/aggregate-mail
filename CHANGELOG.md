@@ -14,9 +14,15 @@ unversioned history without treating it as a release record.
 - Keep Android mail parsing and TLS checks bounded and fail closed, and protect Send confirmation from screen capture. Isolate bootstrap benchmark authentication and provider settings. ([#181](https://github.com/collection-of-things/aggregate-mail/pull/181))
 - Validate decision-model keys as one pair with the effective provider, resolve backup account prefixes in a single bounded pass, and keep inbox classification linear on hostile subjects. Android now rejects mailbox counts and literal announcements before JavaMail allocates for them. ([#189](https://github.com/collection-of-things/aggregate-mail/pull/189))
 
+### Added
+
+- Connect a phone to a headless host with `npm run phone:link`: open the private one-time link and save a passkey without a second host-screen approval. Existing QR pairing still requires matching-code approval. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
 ### Changed
 
 - Use the closing brand image for website link previews, replacing the old inbox screenshot with the Emc² logo and “Email at the speed of light. Inbox, weightless.” ([#190](https://github.com/collection-of-things/aggregate-mail/pull/190))
+- Fit mail cards and notifications to their visible details, tighten Today, Projects, drafts and Settings spacing, and keep short confirmation messages and Undo together. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
 - Keep the view name and search together in a compact toolbar, align sync status and Settings in the sidebar footer, and give calendar events more room beside a smaller month navigator. Dates show the full scheduled count and title-only previews; times and every entry remain available in the larger day list. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 
 - Bring the frontend rebuild layout to the current app: Workspace-first navigation with an account footer, source icons, a compact breadcrumb band, inset mail and draft previews, and document surfaces across reading, work, Calendar, Contacts and Settings. Comfortable mail cards keep their measured scrolling at every width; compact density remains available. Keep dark selection and scrolling date headings readable, preserve compact selection spacing, and open Accounts from the footer. The empty-account footer announces Connect an account. Keep current mail actions, rich drafts, attachments, scheduled sending and protected browser access. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
@@ -26,6 +32,8 @@ unversioned history without treating it as a release record.
 - Give the marketing site light and dark themes. It follows the system setting until the visitor picks one with the header toggle, which is remembered. The dark theme is neutral black with white text, the demo inbox switches to the app's dark scheme, and each painting swaps to a public-domain night counterpart. ([#184](https://github.com/collection-of-things/aggregate-mail/pull/184))
 
 ### Fixed
+
+- Keep mail text aligned when selection checkboxes disappear, avoid scanning the mailbox again on each selection, show sync waits beside the selected count, and inset the Projects empty message. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 
 - Load the phone sign-in and pairing controls when the browser app is installed beneath a hidden directory. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 

@@ -52,7 +52,7 @@ function ToastItem({ toast, leaving, onDismiss, preferences, onOpen, onUndo, und
       <span className="toast-icon" aria-hidden="true"><Icon size={18} /></span>
       <div className="toast-body">
         {countOnly ? <strong role="status" aria-atomic="true" className="toast-title toast-text">{text.slice(0, -1)}</strong> : <>
-          <strong className="toast-title">{toast.kind === "error" ? "Needs attention" : toast.kind === "success" ? "Done" : isMail ? "New email" : "Update"}</strong>
+          <strong className={toast.kind === "success" ? "visually-hidden" : "toast-title"}>{toast.kind === "error" ? "Needs attention" : toast.kind === "success" ? "Done" : isMail ? "New email" : "Update"}</strong>
           <div role={toast.kind === "error" ? "alert" : "status"} aria-atomic="true" className="toast-text">{mail ? text : <Redact text={text} />}</div>
         </>}
         {toast.undo && onUndo && <div className="toast-actions">

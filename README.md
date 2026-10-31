@@ -75,6 +75,19 @@ Use built assets for normal use. Google OAuth callback registration must match
 
 ### Phone access over Tailscale
 
+For a headless host with Phone access already enabled, run `npm run phone:link`
+in the host installation with the same secure launch environment. It uses
+`MAIL_WEB_PASSWORD` and `APP_URL` (or `MAIL_WEB_PORT`). To pipe the recovery
+passphrase from a password manager instead, use `npm run phone:link -- --password-stdin`.
+Never pass a password as a command argument.
+
+Open the printed one-time link on your phone within two minutes, then choose
+**Save passkey and open inbox**. Complete the screen-lock prompt within ten
+minutes. The link grants its first recipient permission to register, so share
+it privately. No second approval on a host screen is needed. The command ends
+its temporary host recovery session; existing paired phones stay connected.
+
+
 From the phone, open the private address and choose **Connect this device**.
 Compare its code with **Settings > Phone access** in the authenticated localhost
 browser on the host. Approve there, then save the passkey on the phone. Starting
@@ -103,8 +116,10 @@ the host. On the phone choose **Save passkey and open inbox**, using Face ID,
 fingerprint or the screen lock supported by that phone. Future visits offer
 **Unlock with passkey**. No password or encryption key needs typing on the phone.
 
-The invitation expires after two minutes, works once and grants no access before
-host approval. Its token is a URL fragment, immediately removed from browser
+An invitation expires after two minutes and works once. QR and ordinary setup
+links require matching-code host approval. Terminal-generated headless links
+carry that approval for their first claim. All paths require a verified passkey
+before inbox access. Its token is a URL fragment, immediately removed from browser
 history. Registration and login challenges are cookie-bound and consumed once.
 Up to eight passkeys may be paired. Settings lists phones with Remove controls;
 a synced passkey may represent more than one physical device. Removing it

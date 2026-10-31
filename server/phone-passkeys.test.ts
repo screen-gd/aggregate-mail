@@ -251,3 +251,54 @@ test("phone-initiated setup still requires matching localhost approval and verif
   assert.equal(result.status, 200);
   assert.equal((await f.call("/api/synthetic", remote, getCookie(result,"__Host-emc2_browser_session"))).status, 200);
 });
+
+
+test("headless setup links authorize only their first claim and still require verified WebAuthn", async (t) => {
+  const f = await fixture(t);
+  assert.equal((await f.call('/api/phone-devices/setup-link', local, '', {confirm: true})).status, 401);
+  assert.equal((await f.host('setup-link', {confirm: true}, {'X-CSRF-Token': ''})).status, 403);
+  assert.equal((await f.host('setup-link', {})).status, 400);
+  const invitation = await f.host('setup-link', {confirm: true});
+  assert.equal(invitation.status, 200);
+  const token = new URL(invitation.body.pairing.url).hash.slice(1);
+  const claimed = await f.call('/auth/passkey/pair', remote, '', {token});
+  assert.equal(claimed.body.approved, true);
+  const cookie = getCookie(claimed, '__Host-emc2_pair');
+  assert.equal((await f.call('/auth/passkey/pair', remote, '', {token})).status, 400);
+  assert.equal((await f.call('/api/synthetic', remote, cookie)).status, 401);
+  assert.equal((await f.call('/auth/passkey/register/options', remote, '', {})).status, 400);
+  const options = await f.call('/auth/passkey/register/options', remote, cookie, {});
+  const auth = authenticator();
+  const result = await f.call('/auth/passkey/register/verify', remote, cookie, auth.registration(options.body.challenge));
+  assert.equal(result.status, 200);
+  assert.equal((await f.call('/api/synthetic', remote, getCookie(result, '__Host-emc2_browser_session'))).status, 200);
+  assert.equal((await f.call('/api/phone-devices/setup-link', remote, getCookie(result, '__Host-emc2_browser_session'), {confirm: true})).status, 403);
+});
+
+test("setup authorization cannot be requested by a phone or survive expiry, cancellation or route loss", async (t) => {
+  const f = await fixture(t);
+  const setup = async () => {
+    const result = await f.host('setup-link', {confirm: true}); assert.equal(result.status, 200);
+    return {id: result.body.pairing.id, token: new URL(result.body.pairing.url).hash.slice(1)};
+  };
+  for (const mode of ['expiry', 'cancel', 'route']) {
+    const invitation = await setup();
+    if (mode === 'expiry') f.advance(120_001);
+    if (mode === 'cancel') await f.host('cancel', {confirm: true, id: invitation.id});
+    if (mode === 'route') { f.gate.setTailnetOrigin(undefined); f.gate.setTailnetOrigin(remote, 10_000_000); }
+    assert.equal((await f.call('/auth/passkey/pair', remote, '', {token: invitation.token})).status, 400, mode);
+  }
+  const invite = await f.connect();
+  const claimed = await f.call('/auth/passkey/pair', remote, '', {token: invite.token, approvedOnClaim: true, approved: true});
+  assert.equal(claimed.body.approved, false);
+  await f.host('cancel', {confirm: true, id: invite.id});
+  const request = await f.call('/auth/passkey/request', remote, '', {approvedOnClaim: true});
+  assert.equal(request.body.approved, false);
+  await f.host('cancel', {confirm: true, id: (await f.host()).body.pairing.id});
+  const next = await setup();
+  const result = await f.call('/auth/passkey/pair', remote, '', {token: next.token});
+  const cookie = getCookie(result, '__Host-emc2_pair');
+  f.advance(600_001);
+  assert.equal((await f.call('/auth/passkey/register/options', remote, cookie, {})).status, 400);
+  assert.equal(f.credentials.size, 0);
+});

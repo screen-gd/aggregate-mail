@@ -37,10 +37,10 @@
     "contextPanel": 226,
     "settingsColumn": 600,
     "rows": {
-      "comfortable": 100,
-      "compact": 24,
-      "narrowComfortable": 100,
-      "narrowCompact": 72
+      "cardBase": 54,
+      "cardMetadata": 18,
+      "cardPreview": 20,
+      "compact": 24
     },
     "avatars": {
       "low": 14,

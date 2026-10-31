@@ -1,4 +1,4 @@
-import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Account, RendererMail } from "../../shared/types";
 import { MAX_MAIL_BATCH, type BulkMailAction, type MailBatchResponse, type MailBatchResult, type MailIdentity } from "../../shared/bulk-mail";
 import { createPortal } from "react-dom";
@@ -32,13 +32,15 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
   const anchor = useRef<string | null>(null);
   const anchorScope = useRef(scope);
   const { on: privacy } = useContext(PrivacyContext);
-  const available = new Set(messages.map(selectionKey));
+  const { available, membership } = useMemo(() => {
+    const available = new Map(messages.map(mail => [selectionKey(mail), mail]));
+    return { available, membership: JSON.stringify([...available.keys()]) };
+  }, [messages]);
   const items = selection.scope === scope ? selection.items.filter(item => available.has(selectionKey(item))) : [];
   const selected = new Set(items.map(selectionKey));
   const blocked = disabled || pending || !!confirmation || snoozing;
   // Selecting is local, so it stays available during sync; only actions wait.
   const actionsBlocked = blocked || syncing;
-  const membership = JSON.stringify(messages.map(selectionKey));
   useEffect(() => {
     setSelection(current => ({ scope, items: current.scope === scope ? current.items.filter(item => available.has(selectionKey(item))) : [] }));
     // Sync refreshes keep a still-listed range anchor and an open dialog whose targets all remain.
@@ -109,12 +111,12 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
     } catch {
       results = submitted.map(item => ({ ...item, status: "unknown" }));
     }
-    const result = { results, items: submitted.map(item => messages.find(mail => selectionKey(mail) === selectionKey(item))).filter((mail): mail is RendererMail => !!mail) };
+    const result = { results, items: submitted.map(item => available.get(selectionKey(item))).filter((mail): mail is RendererMail => !!mail) };
     setOutcome(result);
     try { await reload(); } catch { setOutcome({ ...result, refreshFailed: true }); }
     finally { lock.current = false; setPending(false); }
   };
-  const sentOnly = items.length > 0 && items.every(item => messages.find(mail => selectionKey(mail) === selectionKey(item))?.direction === "sent");
+  const sentOnly = items.length > 0 && items.every(item => available.get(selectionKey(item))?.direction === "sent");
   const sentNote = useId();
   const label = (id: string) => {
     const index = accounts.findIndex(account => account.id === id);
@@ -140,7 +142,8 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
     aria-description={`${toggleLabel} toggles selection. Shift and arrow keys or Shift-click select a range. Escape clears selection.`}
     data-selection={items.length ? "true" : undefined}>
     <span role="status" aria-live="polite" aria-atomic="true" className={items.length ? "rail-count" : "visually-hidden"}>
-      {items.length} messages selected{limit ? `; selection limited to ${MAX_MAIL_BATCH}` : ""}</span>
+      {items.length} messages selected{limit ? `; selection limited to ${MAX_MAIL_BATCH}` : ""}
+      {!!items.length && syncing && !pending && <span className="rail-wait"> · Waiting for sync…</span>}</span>
     {!!items.length && <>
       <span className="rail-accounts">{[...new Set(items.map(item => item.accountId))].map(label).join(", ")}</span>
       <button className="tool" disabled={blocked} onClick={clear}>Clear selection</button>
@@ -152,7 +155,6 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
         else void execute(action);
       }}>{text}</button>)}</span>
     </>}
-    {!!items.length && syncing && !pending && <span role="status">Waiting for sync…</span>}
     {pending && <span role="status">Applying message actions…</span>}
   </div>;
   return <BulkSelectionContext.Provider value={active ? { selected, disabled: blocked, toggle } : null}>
