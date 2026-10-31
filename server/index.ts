@@ -257,6 +257,7 @@ function stateStatus(includeArrivals = true): BootstrapResponse & Partial<Pick<S
     syncing,
   };
 }
+app.get("/api/csrf", (_req, res) => res.json({ csrf }));
 // Status deliberately avoids the mail index, bodies and arrival validation scans.
 app.get("/api/bootstrap", (_req, res) => res.json(stateStatus(false)));
 app.get("/api/state", async (req, res) => {

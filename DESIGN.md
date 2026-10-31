@@ -93,6 +93,9 @@ comfortable preview adds 20px. Compact wide rows remain 24px; compact cards
 omit previews. List windowing assigns the same calculated height to the rendered
 row, including text scaling. A stable selection gutter prevents text movement
 when checkboxes are hidden.
+Background message refreshes preserve the current scroll position. Explicit
+metadata, density and text-size changes keep the selected message in view.
+The bulk count scrolls with its actions so long status text cannot cover them.
 The selected card uses a white document in light mode and a raised surface with
 a visible ring in dark mode. Sticky date headings cover the cards beneath them
 when glass is off. Reader subjects use 20px text; the supported mail body keeps

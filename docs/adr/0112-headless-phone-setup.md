@@ -20,7 +20,12 @@ post-verification checks. No schema or key-storage change is needed.
 secure launch environment or explicitly piped stdin. It never accepts password
 arguments, follows redirects, forwards credentials, retries uncertain writes or
 prints server error bodies. Validate the known login/logout 303 destinations,
-read the authenticated CSRF value, create one link and attempt logout in cleanup.
+read only the existing CSRF value through authenticated `GET /api/csrf`, create
+one link and attempt logout in cleanup. This avoids fetching profile data while
+keeping a 64 KiB response limit. Root URLs normalize to their origin; paths,
+credentials, queries and fragments remain rejected. Busy responses explain
+waiting without retrying. Recovery login retains its existing session-replacement
+and rate-limit policy.
 The command requires an already configured private Phone access route.
 
 ## Consequences and proof

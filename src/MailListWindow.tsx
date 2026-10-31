@@ -11,6 +11,7 @@ export function MailListWindow<T extends Mail>({ messages, selectedId, focusSele
   sort: MailLocation["sort"];
   listRef: RefObject<HTMLElement | null>;
   narrow?: boolean;
+  // Memoize this callback by layout preferences, independent of message refreshes.
   cardContent?: (mail: T) => { metadata: boolean; preview: boolean };
   children: (mail: T, index: number) => ReactNode;
 }) {
@@ -87,18 +88,20 @@ export function MailListWindow<T extends Mail>({ messages, selectedId, focusSele
   const selectedIndex = useMemo(() => messages.findIndex(mail => mail.id === selectedId), [messages, selectedId]);
   const lastSelection = useRef<string | undefined>(undefined);
   const lastLayout = useRef("");
+  const lastCardContent = useRef(cardContent);
   useLayoutEffect(() => {
     const list = listRef.current;
     if (!list || !measured) return;
     if (selectedIndex < 0) { lastSelection.current = undefined; return; }
-    const layout = JSON.stringify([density, narrow, sizes, geometry.rows[selectedIndex]?.bottom - geometry.rows[selectedIndex]?.top]);
+    const layout = JSON.stringify([density, narrow, sizes]);
     const selectionChanged = lastSelection.current !== selectedId;
-    const layoutChanged = lastLayout.current !== layout;
+    const layoutChanged = lastLayout.current !== layout || lastCardContent.current !== cardContent;
     // Density and text sizing keep selection visible; refresh and passive scroll do not snap it back.
     if (!selectionChanged && !layoutChanged) return;
     const behavior = lastSelection.current === undefined || layoutChanged ? "instant" : "auto";
     lastSelection.current = selectedId;
     lastLayout.current = layout;
+    lastCardContent.current = cardContent;
     const row = geometry.rows[selectedIndex];
     const top = windowOffset() + row.top;
     const bottom = windowOffset() + row.bottom;
@@ -112,7 +115,7 @@ export function MailListWindow<T extends Mail>({ messages, selectedId, focusSele
         !active.closest("input, textarea, select, [contenteditable], [role=menu], [role=dialog]"))))
       document.getElementById(`mail-${selectedId}`)?.focus({ preventScroll: true });
     measure();
-  }, [selectedId, selectedIndex, geometry, focusSelection, measured, measure, sizes, sort, windowOffset, density, narrow]);
+  }, [selectedId, selectedIndex, geometry, focusSelection, measured, measure, sizes, sort, windowOffset, density, narrow, cardContent]);
   const top = Math.max(0, viewport.top - viewport.offset - 300);
   const bottom = viewport.top - viewport.offset + viewport.height + 300;
   const firstAfter = (position: number) => {

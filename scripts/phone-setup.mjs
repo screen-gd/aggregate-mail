@@ -1,19 +1,21 @@
 import { pathToFileURL } from "node:url";
 
 const failure = () => new Error("Phone setup failed. Check the local host, recovery passphrase and Phone access route. No request was retried.");
+const busy = new Error("Phone setup is waiting for mail sync or an application update. Wait for it to finish, then run the command again. No request was retried.");
 
 // No redirect is followed, including after login. Credentials stay on loopback.
 export async function createPhoneSetupLink({ origin, password, fetch: request = globalThis.fetch }) {
   let cookie = "";
   try {
     const url = new URL(origin);
-    if (url.origin !== origin || url.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(url.hostname) ||
+    if (url.pathname !== "/" || url.search || url.hash || url.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(url.hostname) ||
         url.username || url.password || !Number.isInteger(Number(url.port)) || Number(url.port) < 1024 || Number(url.port) > 65535 ||
         typeof password !== "string" || password.length < 16 || password.length > 256) throw failure();
+    origin = url.origin;
     const call = (route, options = {}) => request(origin + route, { ...options, redirect: "manual", cache: "no-store",
       signal: AbortSignal.timeout(10_000), headers: { Origin: origin, ...(cookie ? { Cookie: cookie } : {}), ...options.headers } });
     const json = async response => {
-      if (response.status !== 200) { await response.body?.cancel(); throw failure(); }
+      if (response.status !== 200) { await response.body?.cancel(); throw [409, 503].includes(response.status) ? busy : failure(); }
       let text = "";
       const reader = response.body?.getReader();
       if (!reader) throw failure();
@@ -38,7 +40,7 @@ export async function createPhoneSetupLink({ origin, password, fetch: request = 
       if (login.status === 303 && cookies.length === 1) cookie = cookies[0];
       await login.body?.cancel();
       if (!cookie || login.headers.get("location") !== origin) throw failure();
-      const { csrf } = await json(await call("/api/bootstrap"));
+      const { csrf } = await json(await call("/api/csrf"));
       if (typeof csrf !== "string" || !/^[a-f0-9]{64}$/.test(csrf)) throw failure();
       const result = await json(await call("/api/phone-devices/setup-link", { method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: JSON.stringify({ confirm: true }) }));
@@ -53,7 +55,7 @@ export async function createPhoneSetupLink({ origin, password, fetch: request = 
         if (logout.status !== 303 || logout.headers.get("location") !== "/auth") throw failure();
       }
     }
-  } catch { throw failure(); }
+  } catch (error) { throw error === busy ? busy : failure(); }
 }
 
 export async function phoneSetup({ args = process.argv.slice(2), env = process.env, input = process.stdin, output = process.stdout, error = process.stderr } = {}) {
@@ -77,7 +79,7 @@ export async function phoneSetup({ args = process.argv.slice(2), env = process.e
     const link = await createPhoneSetupLink({ origin, password });
     output.write(`Open this one-time link on your phone within two minutes, then save a passkey. Share it privately.\n${link}\n`);
     return 0;
-  } catch { error.write(failure().message + "\n"); return 1; }
+  } catch (cause) { error.write((cause === busy ? busy : failure()).message + "\n"); return 1; }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = await phoneSetup();

@@ -37,6 +37,7 @@ test("the browser target requires its expiring gate session before serving /api"
     });
     const request = (route: string, options: RequestInit = {}) => fetch(`${origin}${route}`, { ...options, redirect: "manual" });
     assert.equal((await request("/api/state")).status, 401);
+    assert.equal((await request("/api/csrf")).status, 401);
     assert.equal((await request("/api/state", { headers: { Cookie: `emc2_browser_session=${"0".repeat(64)}` } })).status, 401);
     const opened = await request("/auth/login", { method: "POST", headers: { Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ password }) });
     assert.equal(opened.status, 303);
@@ -48,6 +49,11 @@ test("the browser target requires its expiring gate session before serving /api"
     assert.equal((await settings.json()).endpoint, `${origin}/mcp`);
     const { csrf } = await state.json();
     assert.equal(typeof csrf, "string");
+    const token = await request("/api/csrf", { headers: { Cookie: cookie, Origin: origin } });
+    assert.equal(token.status, 200);
+    assert.equal(token.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await token.json(), { csrf });
+    assert.equal((await request("/api/csrf", { headers: { Cookie: cookie, Origin: "https://other.example.test" } })).status, 403);
     assert.equal((await request("/api/oauth/google/start", { method: "POST", headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" }, body: "{}" })).status, 403);
     assert.equal((await request("/api/oauth/google/start", { method: "POST", headers: { Cookie: cookie, Origin: origin, "X-CSRF-Token": csrf, "Content-Type": "application/json" }, body: "{}" })).status, 400);
     assert.equal((await request("/api/state", { headers: { Cookie: cookie, Origin: "https://other.example.test" } })).status, 403);

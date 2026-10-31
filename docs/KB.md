@@ -79,7 +79,12 @@ It never trusts client approval fields. Ordinary QR and phone-initiated requests
 still need matching-code approval. User-verified WebAuthn, claim expiry and
 route-lifetime checks remain mandatory. The CLI follows no redirects, accepts
 only the known login/logout 303 destinations, bounds responses and deadlines,
-and attempts logout after acquiring its temporary session. See
+and attempts logout after acquiring its temporary session. It reads only
+`{csrf}` from authenticated `GET /api/csrf`, avoiding profile-size limits from
+bootstrap rules. API authentication, Origin checks and `no-store` still apply.
+Recovery login replaces other localhost recovery sessions and consumes one of
+five login attempts per minute. Existing paired phones are unaffected. Sync
+and update-busy responses give retry-later guidance without automatic retries. See
 [ADR 0112](adr/0112-headless-phone-setup.md).
 
 `server/phone-passkeys.ts` mounts only the public `/auth/pair`, bundled client

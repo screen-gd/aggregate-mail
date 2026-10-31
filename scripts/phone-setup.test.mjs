@@ -24,7 +24,7 @@ function sequence(overrides = {}) {
     if (overrides[path]) return overrides[path]();
     if (path === "/auth/login") return response(303, null, { Location: origin, "Set-Cookie": session + "; Path=/; HttpOnly" });
     assert.equal(options.headers.Cookie, session);
-    if (path === "/api/bootstrap") return response(200, { csrf });
+    if (path === "/api/csrf") return response(200, { csrf });
     if (path === "/api/phone-devices/setup-link") {
       assert.equal(options.headers["X-CSRF-Token"], csrf);
       assert.deepEqual(JSON.parse(options.body), { confirm: true });
@@ -39,7 +39,7 @@ function sequence(overrides = {}) {
 test("setup CLI performs localhost login, CSRF, one creation and logout without following redirects", async () => {
   const f = sequence();
   assert.equal(await createPhoneSetupLink({ origin, password, fetch: f.request }), link);
-  assert.deepEqual(f.calls.map(call => call.path), ["/auth/login", "/api/bootstrap", "/api/phone-devices/setup-link", "/auth/lock"]);
+  assert.deepEqual(f.calls.map(call => call.path), ["/auth/login", "/api/csrf", "/api/phone-devices/setup-link", "/auth/lock"]);
   assert.equal(new URLSearchParams(f.calls[0].options.body).get("password"), password);
   assert.ok(f.calls.slice(1).every(call => !String(call.options.body).includes(password)));
 });
@@ -48,8 +48,9 @@ test("failed login, bad CSRF, redirect, oversized response and uncertain creatio
   for (const [path, result, count] of [
     ["/auth/login", () => response(401, { secret: password }), 1],
     ["/auth/login", () => response(303, null, { Location: "https://foreign.example", "Set-Cookie": session }), 2],
-    ["/api/bootstrap", () => response(200, { csrf: "bad" }), 3],
-    ["/api/bootstrap", () => response(200, { text: "x".repeat(70_000) }), 3],
+    ["/api/csrf", () => response(200, { csrf: "bad" }), 3],
+    ["/api/csrf", () => response(200, { text: "x".repeat(70_000) }), 3],
+    ["/api/phone-devices/setup-link", () => response(200, { text: "x".repeat(70_000) }), 4],
     ["/api/phone-devices/setup-link", () => response(302, null, { Location: "https://foreign.example" }), 4],
     ["/api/phone-devices/setup-link", () => { throw new Error(password); }, 4],
     ["/api/phone-devices/setup-link", () => response(200, { pairing: { url: "https://foreign.example/#token" } }), 4],
@@ -60,7 +61,7 @@ test("failed login, bad CSRF, redirect, oversized response and uncertain creatio
     assert.equal(f.calls.length, count, path);
     if (path !== "/auth/login" || count === 2) assert.equal(f.calls.at(-1).path, "/auth/lock");
   }
-  for (const target of ["https://remote.example", "http://127.0.0.1:3001/path", "http://user@localhost:3001", "http://localhost:80", "http://127.0.0.1:3001?next=bad"]) {
+  for (const target of ["https://remote.example", "http://127.0.0.1:3001/path", "http://user@localhost:3001", "http://localhost:80", "http://127.0.0.1:3001?next=bad", "http://localhost:3001/#fragment"]) {
     await assert.rejects(createPhoneSetupLink({ origin: target, password, fetch: () => assert.fail("must not request") }));
   }
 });
@@ -73,19 +74,38 @@ test("CLI accepts piped recovery input without echo and revokes its real browser
   const gate = browserAccess(password, local);
   let created = 0, cookie = "";
   app.use(gate); app.use(express.json());
-  app.get("/api/bootstrap", (req, res) => { cookie = req.headers.cookie; res.json({ csrf }); });
+  const largeProfile = { rules: [{ excludedMailIds: Array.from({ length: 5000 }, (_, index) => `account:message:${index}`) }] };
+  assert.ok(Buffer.byteLength(JSON.stringify(largeProfile)) > 65_536);
+  app.get("/api/bootstrap", (_req, res) => { assert.fail("setup must not fetch profile data"); res.json(largeProfile); });
+  app.get("/api/csrf", (req, res) => { cookie = req.headers.cookie; res.json({ csrf }); });
   app.post("/api/phone-devices/setup-link", (req, res) => {
     assert.equal(req.headers["x-csrf-token"], csrf); assert.equal(req.body.confirm, true);
     created++; res.json({ pairing: { url: link } });
   });
   let output = "", error = "";
   const io = { output: { write: value => { output += value; } }, error: { write: value => { error += value; } } };
-  assert.equal(await phoneSetup({ args: ["--password-stdin"], env: { APP_URL: local }, input: Readable.from([password + "\n"]), ...io }), 0);
+  assert.equal(await phoneSetup({ args: ["--password-stdin"], env: { APP_URL: local + "/" }, input: Readable.from([password + "\n"]), ...io }), 0);
   assert.equal(created, 1); assert.match(output, /one-time link/); assert.ok(output.includes(link));
   assert.equal(error, ""); assert.ok(!output.includes(password));
-  const locked = await fetch(local + "/api/bootstrap", { headers: { Cookie: cookie } });
+  const locked = await fetch(local + "/api/csrf", { headers: { Cookie: cookie } });
   assert.equal(locked.status, 401); await locked.body.cancel();
   output = "";
   assert.equal(await phoneSetup({ args: [password], env: {}, ...io }), 1);
   assert.equal(output, ""); assert.ok(!error.includes(password));
+});
+
+for (const status of [409, 503]) test(`busy host ${status} explains waiting, attempts once and logs out`, async () => {
+  const f = sequence({ "/api/phone-devices/setup-link": () => response(status, { error: password }) });
+  await assert.rejects(createPhoneSetupLink({ origin, password, fetch: f.request }), cause =>
+    /Wait for it to finish/.test(cause.message) && !cause.message.includes(password));
+  assert.deepEqual(f.calls.map(call => call.path), ["/auth/login", "/api/csrf", "/api/phone-devices/setup-link", "/auth/lock"]);
+  const previous = globalThis.fetch;
+  globalThis.fetch = sequence({ "/api/phone-devices/setup-link": () => response(status, { error: password }) }).request;
+  let error = "";
+  try {
+    assert.equal(await phoneSetup({ args: [], env: { APP_URL: origin, MAIL_WEB_PASSWORD: password },
+      output: { write: () => assert.fail("no link on busy response") }, error: { write: value => { error += value; } } }), 1);
+    assert.match(error, /Wait for it to finish/);
+    assert.ok(!error.includes(password));
+  } finally { globalThis.fetch = previous; }
 });

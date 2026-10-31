@@ -85,7 +85,10 @@ Open the printed one-time link on your phone within two minutes, then choose
 **Save passkey and open inbox**. Complete the screen-lock prompt within ten
 minutes. The link grants its first recipient permission to register, so share
 it privately. No second approval on a host screen is needed. The command ends
-its temporary host recovery session; existing paired phones stay connected.
+its temporary host recovery session. Logging in replaces other localhost
+recovery sessions and uses one of the shared five login attempts per minute;
+existing paired phones stay connected. If sync or an application update is
+running, wait for it to finish before running the command again.
 
 
 From the phone, open the private address and choose **Connect this device**.

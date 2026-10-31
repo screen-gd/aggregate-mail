@@ -33,6 +33,8 @@ unversioned history without treating it as a release record.
 
 ### Fixed
 
+- Preserve mail-list scroll during background content updates, keep bulk controls reachable with larger text, and prevent unread dots from covering timestamps. Headless setup accepts trailing-slash host URLs, avoids loading profile data and explains sync/update waits. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
 - Keep mail text aligned when selection checkboxes disappear, avoid scanning the mailbox again on each selection, show sync waits beside the selected count, and inset the Projects empty message. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 
 - Load the phone sign-in and pairing controls when the browser app is installed beneath a hidden directory. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))

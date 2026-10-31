@@ -105,7 +105,6 @@
 .mail-window-row > .mail-row { height: 100%; }
 .mail-window-row .row.card { height: 100%; padding: calc(8px * var(--text-scale, 1)) 12px; padding-left: 34px; align-items: center; }
 .row.card :is(.row-line, .row-subject, .row-preview) { line-height: calc(18px * var(--text-scale, 1)); }
-.rail-count { position: sticky; left: 0; z-index: 1; background: var(--rebuild-canvas); padding-right: 8px; }
 .rail-wait { color: var(--text-2); }
 .row.card .avatar { display: inline-flex; width: 30px; height: 30px; margin: 0 12px 0 0; }
 .row.card .row-text { gap: calc(2px * var(--text-scale, 1)); }
@@ -117,6 +116,7 @@
 .row.card .row-meta { margin: 0; gap: 8px; line-height: calc(16px * var(--text-scale, 1)); }
 .row.card .row-account { font-size: calc(10px * var(--text-scale, 1)); }
 .mail-row > .row.card .unread-dot { left: auto; right: 12px; top: auto; bottom: 12px; margin: 0; width: 5px; height: 5px; }
+.mail-row:has(.mail-select) > .row.card .unread-dot { top: auto; }
 .row.unread.card .avatar-letter { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent); }
 .list .row.selected, .list:focus-within .row.selected {
   background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), 0 1px 3px var(--hover);

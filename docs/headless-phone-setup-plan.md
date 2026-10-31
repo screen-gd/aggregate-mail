@@ -25,7 +25,9 @@ and narrow layouts with enlarged text, keyboard focus and touch targets.
   exact loopback origin using the host recovery password from the launch
   environment or standard input, never an argument. Never follow redirects. Accept only expected login/logout 303 responses with
   validated destinations, capture the temporary cookie and fetch the existing
-  CSRF token. Bound requests and output, create one link, and attempt logout
+  CSRF token through authenticated `GET /api/csrf` without profile data.
+  Normalize valid root URLs, retain a 64 KiB response cap, and explain sync/update
+  waits without retries. Bound requests and output, create one link, and attempt logout
   in cleanup after any successful login.
   Never retry an uncertain write or echo passwords, cookies or error bodies.
 - Add an explicit `setup-link` action behind existing authenticated localhost,

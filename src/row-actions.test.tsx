@@ -59,6 +59,37 @@ test('the More actions button opens the menu for its own mail without selecting 
  }finally{await ui.close();}
 });
 
+test('background preview and reason changes preserve the passive mail viewport and focus', async () => {
+ const messages = Array.from({length: 80}, (_, index) => ({...mail, id: `m-${index}`}));
+ const ui = await mountRows(messages, {selected: 'm-0'});
+ try {
+  ui.ref.current!.scrollTop = 1800;
+  await act(async () => ui.ref.current!.dispatchEvent(new ui.dom.window.Event('scroll')));
+  const active = document.activeElement;
+  for (const change of [{preview: 'Fetched preview'}, {relevance: 3 as const, reason: 'Needs reply'}]) {
+   await ui.render({messages: messages.map((item, index) => index === 0 ? {...item, ...change} : item)});
+   assert.equal(ui.ref.current!.scrollTop, 1800);
+   assert.equal(document.activeElement, active);
+  }
+ } finally { await ui.close(); }
+});
+
+test('metadata preferences keep an unchanged-height selected row visible', async () => {
+ const messages = Array.from({length: 15}, (_, index) => ({...mail, id: `m-${index}`,
+  relevance: index === 14 ? 3 as const : 2 as const, reason: index === 14 ? 'Needs reply' : ''}));
+ const ui = await mountRows(messages, {selected: 'm-14'});
+ try {
+  const selected = () => ui.rows().find(row => row.dataset.mailId === 'm-14')!;
+  const height = selected().style.height;
+  const active = document.activeElement;
+  await ui.render({showAccount: true});
+  const row = selected();
+  assert.equal(row.style.height, height);
+  assert.ok(parseFloat(row.style.top) + parseFloat(row.style.height) <= ui.ref.current!.scrollTop + 400);
+  assert.equal(document.activeElement, active);
+ } finally { await ui.close(); }
+});
+
 test('direct row actions retain target identity, disabled guards and native button activation', async () => {
  const ui = await mountRows();
  try {
