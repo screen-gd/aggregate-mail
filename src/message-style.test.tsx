@@ -7,11 +7,101 @@ import { MessageText } from "./mail/MessageContent";
 import { FormattedMail } from "./mail/FormattedMail";
 import { AppearanceSettings } from "./settings/AppearanceSettings";
 import { defaultAppearance } from "./appearance";
+import type { Mail } from "../shared/types";
+import { MailList } from "./mail/MailList";
+import { BulkSelectionContext, selectionKey } from "./mail/bulk-selection";
+import { InboxTabs } from "./mail/InboxTabs";
+import { inboxTabs } from "../shared/inbox-tabs";
 
 // The stylesheet entry imports one file per area; jsdom does not follow @import.
 const stylesheet = () => readFileSync(new URL("./style.css", import.meta.url), "utf8")
   .match(/@import "[^"]+";/g)!
   .map((line) => readFileSync(new URL(line.slice(9, -2), import.meta.url), "utf8")).join("\n");
+
+test("opaque sticky date captions cover the rows scrolling beneath them", () => {
+  const dom = new JSDOM('<div class="mail-window-date"><div class="group">Today</div></div>');
+  try {
+    dom.window.document.head.insertAdjacentHTML("beforeend", `<style>${stylesheet()}</style>`);
+    const style = dom.window.getComputedStyle(dom.window.document.querySelector(".group")!);
+    assert.equal(style.position, "sticky");
+    assert.equal(style.backgroundColor, "var(--rebuild-canvas)");
+  } finally { dom.window.close(); }
+});
+
+test("rendered mail rows keep their gutter across checkbox states after the complete stylesheet cascade", () => {
+  const mail: Mail = { id: "a:1", accountId: "a", remoteId: "1", sender: "Team", address: "sender@example.com",
+    to: "reader@example.com", subject: "Work", preview: "Preview", body: "", date: 1, unread: true,
+    category: "important", relevance: 2, reason: "", archived: false, snoozedUntil: null };
+  const dom = new JSDOM("<!doctype html>");
+  try {
+    dom.window.document.head.insertAdjacentHTML("beforeend", `<style>${stylesheet()}</style>`);
+    for (const density of ["compact", "comfortable"] as const) for (const narrow of [false, true]) {
+      for (const state of ["absent", "unchecked", "checked"] as const) {
+        const selected = new Set(state === "checked" ? [selectionKey(mail)] : []);
+        dom.window.document.body.innerHTML = renderToStaticMarkup(<div className={`list ${density}`}>
+          <BulkSelectionContext.Provider value={state === "absent" ? null : { selected, disabled: false, toggle: () => {} }}>
+            <MailList messages={[mail]} selectedId={undefined} density={density} narrow={narrow} sort="newest"
+              opening="double" accounts={[]} listRef={{ current: null }} focusSelection={false}
+              onOpen={() => {}} onSelect={() => {}} onMenu={() => {}} onMenuKey={() => {}} />
+          </BulkSelectionContext.Provider>
+        </div>);
+        const context = `${density}, narrow=${narrow}, checkbox=${state}`;
+        const row = dom.window.document.querySelector(".mail-window-row > .mail-row > .row")!;
+        const checkbox = dom.window.document.querySelector(".mail-select");
+        assert.ok(row, context);
+        assert.equal(checkbox?.getAttribute("aria-checked"), state === "absent" ? undefined : String(state === "checked"), context);
+        assert.equal(dom.window.getComputedStyle(row).paddingLeft, "34px", context);
+        if (checkbox) {
+          const style = dom.window.getComputedStyle(checkbox);
+          assert.equal(style.position, "absolute", context);
+          assert.equal(style.left, "10px", context);
+          assert.equal(style.top, "50%", context);
+          assert.equal(style.transform, "translateY(-50%)", context);
+        }
+      }
+    }
+  } finally { dom.window.close(); }
+});
+
+test("Inbox categories show only the active name in both reading layouts", () => {
+  const dom = new JSDOM("<!doctype html>");
+  try {
+    dom.window.document.head.insertAdjacentHTML("beforeend", `<style>${stylesheet()}</style>`);
+    for (const reading of ["full", "split"]) for (const active of inboxTabs) {
+      dom.window.document.body.innerHTML = renderToStaticMarkup(<div className="app"><div className="app-main">
+        <div className="mail-category-bar"><InboxTabs tab={active.id} unread={new Map(inboxTabs.map(({ id }) => [id, 3]))} onTab={() => {}} /></div>
+        <div className={`workspace ${reading === "split" ? "split" : ""}`} />
+      </div></div>);
+      for (const button of dom.window.document.querySelectorAll<HTMLButtonElement>(".inbox-tabs button")) {
+        const label = button.querySelector(".tab-label")!;
+        const style = dom.window.getComputedStyle(label);
+        const selected = button.getAttribute("aria-current") === "page";
+        assert.equal(button.title, label.textContent);
+        assert.equal(style.position === "absolute", !selected, `${reading}: ${button.title}`);
+        if (!selected) {
+          assert.equal(style.clipPath, "inset(50%)");
+          assert.notEqual(style.display, "none", "the category name remains accessible");
+        }
+        assert.ok(button.querySelector("svg"));
+        assert.notEqual(dom.window.getComputedStyle(button.querySelector(".tab-count")!).display, "none");
+      }
+    }
+  } finally { dom.window.close(); }
+});
+
+test("dark selection is distinct and rebuild headers and footers retain shared geometry", () => {
+  const dom = new JSDOM('<div class="app"><div class="list"><button class="row card selected"></button></div><section class="work-pane"><header class="main-head"></header></section><div class="compose-dialog"><footer class="compose-footer"></footer></div></div>');
+  try {
+    const document = dom.window.document;
+    document.documentElement.dataset.scheme = "dark";
+    document.head.insertAdjacentHTML("beforeend", `<style>${stylesheet()}</style>`);
+    const style = (selector: string) => dom.window.getComputedStyle(document.querySelector(selector)!);
+    assert.equal(style(".row").backgroundColor, "var(--raised)");
+    assert.match(style(".row").boxShadow, /var\(--text-3\)/);
+    assert.equal(style(".main-head").height, "auto");
+    assert.equal(style(".compose-footer").minHeight, "var(--app-footer-height)");
+  } finally { dom.window.close(); }
+});
 
 test("theme choices grow above accent swatches without inheriting the mail-row height", () => {
   const dom = new JSDOM("<!doctype html>");
@@ -86,5 +176,19 @@ test("sender colors, backgrounds, borders and links use the app theme", () => {
     assert.equal((cell.querySelector("span") as HTMLElement).style.color, "");
     assert.equal((cell.querySelector("span") as HTMLElement).style.textDecoration, "");
     assert.match(css, /\.formatted-mail a\s*\{[^}]*text-decoration-thickness:\s*1px/);
+  } finally { dom.window.close(); }
+});
+
+
+test("selected mail rail grows around wrapping counts and actions without a scroll-only toolbar", () => {
+  const dom = new JSDOM('<div class="mail-category-bar"><div class="rail-actions"><div class="rail-triage" data-selection="true"><span class="rail-count">200 messages selected; selection limited to 200</span><span class="rail-tools"><button class="tool">Move to Trash</button></span></div></div></div>');
+  try {
+    dom.window.document.head.insertAdjacentHTML("beforeend", `<style>${stylesheet()}</style>`);
+    const style = (selector: string) => dom.window.getComputedStyle(dom.window.document.querySelector(selector)!);
+    assert.equal(style(".mail-category-bar").height, "auto");
+    assert.equal(style(".rail-triage").flexWrap, "wrap");
+    assert.equal(style(".rail-tools").flexWrap, "wrap");
+    assert.notEqual(style(".rail-triage").overflowX, "auto");
+    assert.notEqual(style(".rail-count").whiteSpace, "nowrap");
   } finally { dom.window.close(); }
 });

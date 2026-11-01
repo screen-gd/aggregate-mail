@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { Segmented } from "../ui/Segmented";
 import { useId, useState } from "react";
 import { defaults, interactionActions, shortcutFromEvent, shortcutLabel, validateShortcut, type InteractionPreferences } from "../interaction";
@@ -14,15 +15,13 @@ export function InteractionSettings({ value, onChange }: {
   onChange: (value: InteractionPreferences) => void;
 }) {
   const prefix = useId();
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const [sequence, setSequence] = useState<{ id: string; first?: string } | null>(null);
   return <section data-interaction-settings aria-label="Interaction settings">
     <div className="settings-row interaction-opening">
       <div>
         <span id={`${prefix}-opening`}>Open email</span>
-        <p className="note">{value.opening === "double"
-          ? "Select with one click. Open with two."
-          : "One click opens email and marks it read."}</p>
+
       </div>
       <Segmented labelledBy={`${prefix}-opening`} value={value.opening}
         choices={[{ id: "double", label: "Double click" }, { id: "single", label: "Single click" }]}
@@ -31,13 +30,21 @@ export function InteractionSettings({ value, onChange }: {
     <label className="settings-row"><span>Mouse side buttons navigate Back / Forward</span>
       <input type="checkbox" role="switch" checked={value.mouseHistory} onChange={event => onChange({ ...value, mouseHistory: event.target.checked })} />
     </label>
-    <p className="note">Right-click an email for actions. When enabled, mouse side buttons go Back and Forward.</p>
+
+    <label className="settings-row"><span>Phone swipes navigate Back / Forward</span>
+      <input type="checkbox" role="switch" checked={value.touchNavigation} onChange={event => onChange({ ...value, touchNavigation: event.target.checked })} />
+    </label>
+    <label className="settings-row"><span>Phone mail gestures</span>
+      <input type="checkbox" role="switch" checked={value.mailGestures} onChange={event => onChange({ ...value, mailGestures: event.target.checked })} />
+    </label>
+    <details className="settings-help"><summary>Mail gestures</summary><p>Swipe left to archive, right to mark read or unread. Hold to select. Swipes pause while messages are selected.</p></details>
+
     <div className="interaction-shortcuts-heading">
       <h2>Keyboard shortcuts</h2>
       <button type="button" className="link" onClick={() => { setError(""); onChange(structuredClone(defaults)); }}>Reset interaction defaults</button>
     </div>
-    <p className="note" id={`${prefix}-hint`}>Focus a shortcut and press a key combination. Escape closes settings. Tab moves focus. Editing and system shortcuts stay reserved.</p>
-    <p className="attention" role="status" aria-live="polite">{error}</p>
+    <p className="visually-hidden" id={`${prefix}-hint`}>Focus a shortcut and press a key combination. Escape closes settings. Tab moves focus. Editing and system shortcuts stay reserved.</p>
+    <Notice text={error} />
     <div className="interaction-shortcut-groups">
       {shortcutGroupNames.map((group) => <section className="interaction-shortcut-group" key={group} aria-label={group}>
         <h3>{group}</h3>
@@ -69,7 +76,7 @@ export function InteractionSettings({ value, onChange }: {
         </div>)}
       </section>)}
     </div>
-    <p className="note">Gmail defaults: G then I/T/D/A/S/B opens Inbox/Sent/Drafts/All cached/Pinned/Snoozed. U returns to the list. Choose Sequence and press two letters to customize a sequence. Sequences must finish within 1.5 seconds during use.</p>
+    <details className="settings-help"><summary>Sequence shortcuts</summary><p className="note">Gmail defaults: G then I/T/D/A/S/B opens Inbox/Sent/Drafts/All cached/Pinned/Snoozed. U returns to the list. Choose Sequence and press two letters to customize a sequence. Sequences must finish within 1.5 seconds during use.</p></details>
     <details className="interaction-fixed-shortcuts">
       <summary>System and fixed shortcuts</summary>
       <p className="note">Fixed shortcuts: Ctrl/Cmd +, − and 0 resize or reset text. Page Up/Down selects the previous/next email. Enter also opens with the default O binding. Escape closes email or dialogs; Tab moves focus (on the page body, the next Inbox category); 0-9 filters accounts. On Mac, Cmd+[ and Cmd+] go Back and Forward.</p>

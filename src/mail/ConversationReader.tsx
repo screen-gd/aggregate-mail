@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import type { RendererMail as Mail } from "../../shared/types";
 import { LOCAL_EVIDENCE_CAVEAT, type Conversation } from "../../shared/workspace";
@@ -51,7 +52,7 @@ export function ConversationReader({ mail, gmail, api, busy, onChanged, onSelect
   const [conversation, setConversation] = useState<Conversation>();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const region = useId();
   const active = useRef(false);
   const generation = useRef(0);
@@ -96,7 +97,7 @@ export function ConversationReader({ mail, gmail, api, busy, onChanged, onSelect
     {(multiple || canExpand || error) && <div className="conversation-bar">
       {multiple && <span>{ordered.length} messages in this conversation</span>}
       {canExpand && <button type="button" className="link" disabled={pending || busy} onClick={() => void fetchRest()}>{pending ? "Loading conversation…" : "Load full conversation"}</button>}
-      {error && <span role="alert">{error}</span>}
+      {error && <Notice text={error} />}
       {(multiple || !!error || gaps.length > 0) && <details className="conversation-notes">
         <summary>Why some messages may be missing</summary>
         <ul>

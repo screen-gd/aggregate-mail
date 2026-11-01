@@ -67,8 +67,9 @@ import { Dialog } from "./ui/Dialog";
 import { MailPrivacy, PrivacyContext, Redact } from "./ui/Privacy";
 import { drawsWindowControls, systemCaption } from "./ui/TrafficLights";
 import { useMedia } from "./ui/useMedia";
+import { useSwipe } from "./ui/useSwipe";
 import { CredentialFallbackNotice } from "./shell/CredentialFallbackNotice";
-import { ToastStack, useToasts } from "./ui/Toasts";
+import { Notice, NotificationProvider, ToastStack, useToasts } from "./ui/Toasts";
 import { ArrowLeft, ArrowRight, ChevronRight, Eye, EyeOff, Mail as MailIcon, Settings as SettingsIcon, SidebarIcon } from "./ui/icons";
 
 // Direction the list pane enters from: tabs slide sideways, mail opens upward.
@@ -102,6 +103,7 @@ export function App() {
   const [interaction, setInteraction] = useState(readInteraction);
   const shortcut = (action: typeof interactionActions[number]["id"]) => shortcutLabel(interaction.shortcuts[action]);
   const [searching, setSearching] = useState(false);
+  const [searchOptions, setSearchOptions] = useState(false);
   const settingsSearchPending = useRef(false);
   const settings = page === "settings";
   const [accountSettingsTarget, setAccountSettingsTarget] = useState<string>();
@@ -298,10 +300,9 @@ export function App() {
     const symbolColor = hexColor(tokens.getPropertyValue("--text"));
     if (color && symbolColor) window.desktop?.setOverlay?.({ color, symbolColor });
   }, [appearance, scheme, themePreview]);
-  // Panes that need room drop out as the window narrows: the sender panel, then
-  // the reader beside the list (mail then opens in place), then the sidebar.
+  // Tablets use one reading column; phones also move navigation into a drawer.
   const roomy = useMedia("(min-width: 760px)");
-  const splitRoom = useMedia("(min-width: 980px)");
+  const splitRoom = useMedia("(min-width: 1200px)");
   const split = appearance.reading === "split" && splitRoom;
   const sidebarShown = roomy ? sidebarOpen : mobileSidebarOpen;
   const fromSidebar = (action: () => unknown) => { action(); setMobileSidebarOpen(false); };
@@ -351,6 +352,9 @@ export function App() {
   }, [notifications, privacy, setNotice]);
   const [loaded, setLoaded] = useState(false);
   const [ready, setReady] = useState(false);
+  const swipeNavigation = useSwipe(direction => travel(direction === "right" ? -1 : 1),
+    ready && !window.desktop && !roomy && interaction.touchNavigation && !navigationBlocked &&
+    !mobileSidebarOpen && !contextMenu && !palette && !busy && !eventDirty);
   const [mailLoadError, setMailLoadError] = useState("");
   const startupLoad = useRef<AbortController | undefined>(undefined);
   const csrf = useRef("");
@@ -1006,7 +1010,7 @@ export function App() {
       const editing = element?.closest('input, textarea, select, [role="combobox"], [contenteditable]:not([contenteditable="false"]), [data-interaction-settings]');
       const dialog = element?.closest('dialog, [role="dialog"]');
       const sequenceScope = !toolbarBlocked && !editing && !element?.closest('[role="menu"]') &&
-        (!dialog || compose && dialog.matches(".compose-dialog") || settings && dialog.matches(".settings-dialog"));
+        (!dialog || compose && dialog.matches('.compose-dialog, [data-dialog-panel~="compose-dialog"]') || settings && dialog.matches('.settings-dialog, [data-dialog-panel~="settings-dialog"]'));
       // Invalid sequences never fall through to mutations, while editors keep their keys.
       if (sequence && !action && sequenceScope && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); return; }
       const prefixKey = event.key.toLowerCase();
@@ -1222,6 +1226,9 @@ export function App() {
       {privacy ? <EyeOff color="currentColor" size={15} /> : <Eye color="currentColor" size={15} />}
     </button>
   );
+  const fullReader = opened && !split;
+  const showInboxCategories = view === "inbox" && !query && !(fullReader && appearance.readerToolbar === "actions");
+  const combinedReaderToolbar = fullReader && appearance.readerToolbar !== "separate";
   const actions = selected && (
     <MailActions
       mail={selected}
@@ -1376,7 +1383,7 @@ export function App() {
     ...(!settings ? mailCommands : []),
   ];
   return (
-    <MailSearchApiContext.Provider value={api}><PrivacyContext.Provider
+    <NotificationProvider push={pushToast}><MailSearchApiContext.Provider value={api}><PrivacyContext.Provider
       value={privacyContext}
     >
       <div
@@ -1437,7 +1444,7 @@ export function App() {
               onClose: () => setSettings(false),
             }}
           />
-          <div className="app-main" inert={!roomy && mobileSidebarOpen}>
+          <div className="app-main" ref={swipeNavigation} inert={!roomy && mobileSidebarOpen}>
             <PaneHeader className="app-toolbar" corner={corner("main")} maximized={maximized} lead={sidebarToggle}>
               <div className="app-context" aria-label="Current view">
                 <span>{settings ? "Emc²" : nonMailView ? "Workspace" : "Mail"}</span>
@@ -1445,10 +1452,10 @@ export function App() {
                 <ViewIcon size={16} color="currentColor" />
                 <strong>{settings ? "Settings" : viewNames[view]}</strong>
               </div>
-              {!settings && historyControls}
               <SearchToolbar inputRef={searchRef} scopeKey={JSON.stringify([page, view, accountFilter, labelFilter, readFilter, relevanceFilter, opened])} query={settings || nonMailView ? "" : query}
                 onSaveView={!settings && !nonMailView && !compose && savedViews.canSave ? savedViews.startSave : undefined}
                 label="Search cached mail and saved drafts"
+                optionsOpen={searchOptions} onOptions={() => { setSearching(true); setSearchOptions(value => !value); }}
                 invalid={!settings && !nonMailView && !!search.error} disabled={toolbarBlocked} commandsDisabled={toolbarBlocked || (!!compose && busy)} shortcut={shortcut("search")} onFocus={() => setSearching(true)}
                 onChange={(value) => {
                   setSearching(true);
@@ -1473,12 +1480,15 @@ export function App() {
                 />}
                 {privacyButton}
               </div>
+              {!settings && historyControls}
               <div className="update-spacer" aria-hidden="true" />
             </PaneHeader>
-            <div hidden={!searching || settings || nonMailView} className="search-help">
-              <span id="mail-search-help" role={search.error ? "alert" : "status"} aria-live="polite" aria-atomic="true">{search.error || (search.pending ? "Searching cached mail and saved drafts…" : `${filtered.length} mail results${showSearchDrafts ? `, ${search.drafts.filter(draft => accountFilter === "all" || draft.accountId === accountFilter).length} saved drafts` : ""}. ${mailSearchScope(navigation.location, state.accounts, activeLabel, privacy, showSearchDrafts)}`)}</span>
+            <div hidden={!searching || settings || nonMailView}>
+              <Notice text={!settings && !nonMailView ? search.error || "" : ""} />
+              <span id="mail-search-help" className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">{search.error || (search.pending ? "Searching cached mail and saved drafts…" : `${filtered.length} mail results${showSearchDrafts ? `, ${search.drafts.filter(draft => accountFilter === "all" || draft.accountId === accountFilter).length} saved drafts` : ""}. ${mailSearchScope(navigation.location, state.accounts, activeLabel, privacy, showSearchDrafts)}`)}</span>
+              {searchOptions && <div className="search-help" id="search-options">
               <ProviderSearch api={api} query={query} account={searchAccount} accountName={searchAccount ? accountLabel(searchAccount, state.accounts.indexOf(searchAccount), privacy, state.accounts) : ""} blocked={toolbarBlocked || busy} visible={!settings && !nonMailView && view !== "drafts" && !search.error && !search.pending} reload={reload} />
-              <details><summary>Search help</summary><p>Use from:, to:, subject:, body:, account:, is:unread, is:pinned, before:YYYY-MM-DD or after:YYYY-MM-DD. Unquoted words allow one typo. Searches imported mail and saved drafts on this device, including Sent, Archive and Snoozed. Provider history may be incomplete. With one account selected, searching older mail asks the provider for up to 100 more matches: Gmail uses Gmail search, IMAP searches Archive (or All Mail) and Sent, and account: and is:pinned apply only on this device.</p></details>
+              <p>Use from:, to:, subject:, body:, account:, is:unread, is:pinned, before:YYYY-MM-DD or after:YYYY-MM-DD. Unquoted words allow one typo. Searches imported mail and saved drafts on this device, including Sent, Archive and Snoozed. Provider history may be incomplete. With one account selected, searching older mail asks the provider for up to 100 more matches: Gmail uses Gmail search, IMAP searches Archive (or All Mail) and Sent, and account: and is:pinned apply only on this device.</p></div>}
             </div>
         {contactsView ? (
           <div className="contacts-pane" inert={!!compose}><ContactsPage key={accountFilter} api={api} accounts={state.accounts} accountFilter={accountFilter} busy={busy} /></div>
@@ -1498,21 +1508,23 @@ export function App() {
               reader={selected && opened ? <div ref={readerRef} className="today-mail">{actions}{reader}</div> : undefined} />}
           </main>
         ) : (
-          <div className="mail-view" inert={!!compose}>
+          <div className={`mail-view${fullReader ? " full-reading" : ""}`} data-reader-toolbar={appearance.readerToolbar} inert={!!compose}>
               <h1 className="pane-title visually-hidden">{viewNames[view]}</h1>
               {(view === "sent" || view === "all") && <PaneHeader className="main-head mail-view-head" corner={null} maximized={maximized}>
                 <span className="view-summary">{loaded ? `${filtered.length} cached ${filtered.length === 1 ? "message" : "messages"}` : "Loading cached mail"}</span>
-                {(view === "sent" || view === "all") && <div className="head-note">Cached mail only. <button type="button" title={accountFilter === "all" ? "Select one account to fetch up to 50 Sent messages" : "Fetch up to 50 Sent messages"} disabled={busy || accountFilter === "all"} onClick={() => void perform(async () => { const coverage = await api<SentCoverage>(`/accounts/${encodeURIComponent(accountFilter)}/sent/sync`, "POST", { bound: 50 }); if (coverage.error) throw new Error("Sent import failed. Existing cached mail remains available."); }, "Sent cache refreshed.")}>Fetch Sent</button>{accountFilter === "all" && <small>Choose an account first.</small>}</div>}
+                {(view === "sent" || view === "all") && <div className="head-note"><button type="button" title={accountFilter === "all" ? "Select one account to fetch up to 50 Sent messages" : "Fetch up to 50 Sent messages"} disabled={busy || accountFilter === "all"} onClick={() => void perform(async () => { const coverage = await api<SentCoverage>(`/accounts/${encodeURIComponent(accountFilter)}/sent/sync`, "POST", { bound: 50 }); if (coverage.error) throw new Error("Sent import failed. Existing cached mail remains available."); }, "Sent cache refreshed.")}>Fetch Sent</button></div>}
               </PaneHeader>}
-              <div className="mail-category-bar">
-                <div className="rail-select" ref={setRailSelect} />
-                {view === "inbox" && !query && <InboxTabs tab={tab} unread={tabUnread} onTab={switchTab} />}
-                <div className="rail-actions" ref={setRailActions} />
-              </div>
+              {(!opened || showInboxCategories || combinedReaderToolbar) && <div className="mail-category-bar">
+                {!opened && <div className="rail-select" ref={setRailSelect} />}
+                {showInboxCategories &&
+                  <InboxTabs tab={tab} unread={tabUnread} onTab={switchTab} compact={!splitRoom} />}
+                {!opened && <div className="rail-actions" ref={setRailActions} />}
+                {combinedReaderToolbar && actions}
+              </div>}
           <main className={split ? "workspace split" : "workspace"}>
             <section className="list-pane">
               {!settings && <CredentialFallbackNotice mode={window.desktop?.credentialFallback} />}
-              {opened && !split && actions}
+              {fullReader && !combinedReaderToolbar && actions}
               <div
                 ref={listRef}
                 className={`list ${density}`}
@@ -1536,9 +1548,15 @@ export function App() {
                     focusSelection={!navigationBlocked && !contextMenu}
                     selectedId={selected?.id}
                     density={density}
-                    narrow={split}
+                    narrow={split || !splitRoom}
                     sort={sort}
                     opening={interaction.opening}
+                    mailGestures={ready && !window.desktop && !roomy && interaction.mailGestures}
+                    onSwipe={(mail, direction) => {
+                      if (navigationBlocked || mobileSidebarOpen || contextMenu || palette || busy || syncing || eventDirty) return;
+                      const action = mailMenuActions(mail).find(item => item.id === (direction === "left" ? "archive" : mail.unread ? "read" : "unread"));
+                      if (action && !action.disabled) action.run();
+                    }}
                     accounts={state.accounts}
                     showAccount={accountFilter === "all" && state.accounts.length > 1}
                     actions={(mail) => mailMenuActions(mail).map((action) => action.id === "snooze"
@@ -1846,6 +1864,6 @@ export function App() {
         )}
         {shortcuts && <ShortcutsDialog shortcut={shortcut} onClose={() => setShortcuts(false)} />}
       </div>
-    </PrivacyContext.Provider></MailSearchApiContext.Provider>
+    </PrivacyContext.Provider></MailSearchApiContext.Provider></NotificationProvider>
   );
 }

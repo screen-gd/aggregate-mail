@@ -186,7 +186,7 @@ test("formatted reader recovery keeps text on failure, ignores late content and 
     assert.equal(container.querySelector("img"), null);
     await act(async () => reject(new Error("offline")));
     assert.ok(container.textContent?.includes("Formatted email is unavailable"));
-    await act(async () => button("Try again").click());
+    await act(async () => button("Retry formatted email").click());
     const oldResolve = resolve;
     await render("new", false, null);
     await act(async () => oldResolve({ html: "<h2>Old private content</h2>", images: [image] }));
@@ -208,7 +208,7 @@ test("formatted reader recovery keeps text on failure, ignores late content and 
     await act(async () => reject(new Error("offline")));
     assert.ok(button("Show images"), "content failure keeps the image control available");
     assert.ok(container.querySelector('[aria-label="Attachments"]'), "unknown attachments stay explicit");
-    await act(async () => button("Try again").click());
+    await act(async () => button("Retry formatted email").click());
     await act(async () => resolve({ html: null, images: [], attachments: [] }));
     assert.equal(container.querySelector('.image-controls'), null);
     assert.equal(container.querySelector('[aria-label="Attachments"]'), null);

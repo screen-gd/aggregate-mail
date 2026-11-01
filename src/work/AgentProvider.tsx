@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { agentProviders, type AgentProvider as Provider, type AgentProviderSettings } from "../../shared/agent-provider";
 import type { AgentGrant, AgentProposal } from "../../shared/workspace";
@@ -24,8 +25,8 @@ export function AgentProvider({ grant, state, api, mcpEnabled, disabled, onPrepa
   const [instruction, setInstruction] = useState("");
   const [pending, setPending] = useState(false);
   const [unresolved, setUnresolved] = useState(false);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
+  const [status, setStatus] = useFeedbackState("success");
+  const [error, setError] = useFeedbackState();
   const epoch = useRef(0);
   const active = useRef(false);
   const busy = useRef(false);
@@ -105,8 +106,8 @@ export function AgentProvider({ grant, state, api, mcpEnabled, disabled, onPrepa
   return <details className="work-form" onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary>Bring your own key</summary>
     <p className="work-meta">Choose a provider and save your API key, then choose one email to prepare a reply for review. The key stays encrypted on this device and is never shown after saving.</p>
-    {error && <p role="alert">{error}</p>}
-    {status && <p role="status">{status}</p>}
+    {error && <Notice text={error} />}
+    {status && <Notice text={status} kind="success" />}
     {unresolved && <div><p>Preparation is unresolved. Refresh action history and inspect Proposals before preparing another draft.</p><button type="button" disabled={pending || disabled} onClick={() => void refreshUnresolved()}>Refresh action history</button></div>}
     <fieldset disabled={!loaded || pending || disabled} className="work-editing">
       <form className="settings-form work-form" onSubmit={(event) => { event.preventDefault(); void save(); }}>

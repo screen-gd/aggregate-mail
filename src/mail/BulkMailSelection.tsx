@@ -1,4 +1,5 @@
-import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Notice, NotificationContext } from "../ui/Toasts";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Account, RendererMail } from "../../shared/types";
 import { MAX_MAIL_BATCH, type BulkMailAction, type MailBatchResponse, type MailBatchResult, type MailIdentity } from "../../shared/bulk-mail";
 import { createPortal } from "react-dom";
@@ -24,6 +25,11 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
 }) {
   const [selection, setSelection] = useState<{ scope: string; items: MailIdentity[] }>({ scope, items: [] });
   const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const push = useContext(NotificationContext);
+  const succeeded = !!outcome && !outcome.refreshFailed && outcome.results.every(item => item.status === "done");
+  // The success Notice publishes its toast in its own effect, which runs first.
+  // Clearing afterwards stops a remount, such as closing a message, from repeating it.
+  useEffect(() => { if (active && succeeded && push) setOutcome(null); }, [active, succeeded, push]);
   const [confirmation, setConfirmation] = useState<MailIdentity[] | null>(null);
   const [snoozing, setSnoozing] = useState(false);
   const [pending, setPending] = useState(false);
@@ -32,13 +38,15 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
   const anchor = useRef<string | null>(null);
   const anchorScope = useRef(scope);
   const { on: privacy } = useContext(PrivacyContext);
-  const available = new Set(messages.map(selectionKey));
+  const { available, membership } = useMemo(() => {
+    const available = new Map(messages.map(mail => [selectionKey(mail), mail]));
+    return { available, membership: JSON.stringify([...available.keys()]) };
+  }, [messages]);
   const items = selection.scope === scope ? selection.items.filter(item => available.has(selectionKey(item))) : [];
   const selected = new Set(items.map(selectionKey));
   const blocked = disabled || pending || !!confirmation || snoozing;
   // Selecting is local, so it stays available during sync; only actions wait.
   const actionsBlocked = blocked || syncing;
-  const membership = JSON.stringify(messages.map(selectionKey));
   useEffect(() => {
     setSelection(current => ({ scope, items: current.scope === scope ? current.items.filter(item => available.has(selectionKey(item))) : [] }));
     // Sync refreshes keep a still-listed range anchor and an open dialog whose targets all remain.
@@ -101,7 +109,7 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
   }, [active]);
   const execute = async (action: BulkMailAction, submitted = items, until?: number) => {
     if (lock.current || disabled || syncing || !submitted.length) return;
-    lock.current = true; setPending(true); setConfirmation(null); setSnoozing(false); clear();
+    lock.current = true; setPending(true); setOutcome(null); setConfirmation(null); setSnoozing(false); clear();
     let results: MailBatchResult[];
     try {
       const response = await api<MailBatchResponse>("/messages/batch", "POST", { items: submitted, operation: { action, ...(until ? { until } : {}) } });
@@ -109,13 +117,12 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
     } catch {
       results = submitted.map(item => ({ ...item, status: "unknown" }));
     }
-    const result = { results, items: submitted.map(item => messages.find(mail => selectionKey(mail) === selectionKey(item))).filter((mail): mail is RendererMail => !!mail) };
+    const result = { results, items: submitted.map(item => available.get(selectionKey(item))).filter((mail): mail is RendererMail => !!mail) };
     setOutcome(result);
     try { await reload(); } catch { setOutcome({ ...result, refreshFailed: true }); }
     finally { lock.current = false; setPending(false); }
   };
-  const sentOnly = items.length > 0 && items.every(item => messages.find(mail => selectionKey(mail) === selectionKey(item))?.direction === "sent");
-  const sentNote = useId();
+  const sentOnly = items.length > 0 && items.every(item => available.get(selectionKey(item))?.direction === "sent");
   const label = (id: string) => {
     const index = accounts.findIndex(account => account.id === id);
     return index < 0 ? "Unavailable account" : accountLabel(accounts[index], index, privacy, accounts);
@@ -140,19 +147,17 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
     aria-description={`${toggleLabel} toggles selection. Shift and arrow keys or Shift-click select a range. Escape clears selection.`}
     data-selection={items.length ? "true" : undefined}>
     <span role="status" aria-live="polite" aria-atomic="true" className={items.length ? "rail-count" : "visually-hidden"}>
-      {items.length} messages selected{limit ? `; selection limited to ${MAX_MAIL_BATCH}` : ""}</span>
+      {items.length} messages selected{limit ? `; selection limited to ${MAX_MAIL_BATCH}` : ""}
+      {!!items.length && syncing && !pending && <span className="rail-wait"> · Waiting for sync…</span>}</span>
     {!!items.length && <>
       <span className="rail-accounts">{[...new Set(items.map(item => item.accountId))].map(label).join(", ")}</span>
       <button className="tool" disabled={blocked} onClick={clear}>Clear selection</button>
-      {sentOnly && <span id={sentNote}>Sent mail supports Pin, Unpin and Move to Trash only.</span>}
-      <span className="rail-tools">{actions.map(([action, text], index) => <button key={index} className="tool" disabled={actionsBlocked || sentOnly && !sentActions.has(action)}
-        aria-describedby={sentOnly && !sentActions.has(action) ? sentNote : undefined} onClick={() => {
+      <span className="rail-tools">{actions.filter(([action]) => !sentOnly || sentActions.has(action)).map(([action, text], index) => <button key={index} className="tool" disabled={actionsBlocked} onClick={() => {
         if (action === "trash") setConfirmation(items.map(item => ({ ...item })));
         else if (action === "snooze") setSnoozing(true);
         else void execute(action);
       }}>{text}</button>)}</span>
     </>}
-    {!!items.length && syncing && !pending && <span role="status">Waiting for sync…</span>}
     {pending && <span role="status">Applying message actions…</span>}
   </div>;
   return <BulkSelectionContext.Provider value={active ? { selected, disabled: blocked, toggle } : null}>
@@ -161,7 +166,10 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
       {active && railSelect && createPortal(master, railSelect)}
       {active && railActions && createPortal(triage, railActions)}
       {active && (!railSelect || !railActions) && <div className="bulk-bar">{!railSelect && master}{!railActions && triage}</div>}
-      {active && outcome && <div className="bulk-result" role="status">
+      {active && outcome && (outcome.results.every(item => item.status === "done") && !outcome.refreshFailed
+        ? <Notice text={`${outcome.results.length} messages updated.`} kind="success" />
+        : <><Notice text={`${outcome.results.filter(item => item.status === "done").length} done, ${outcome.results.filter(item => item.status === "failed").length} failed, ${outcome.results.filter(item => item.status === "unknown").length} unknown.${outcome.refreshFailed ? " Refreshing mail failed." : ""} Review action results before trying again.`} />
+        <details className="bulk-result"><summary>Review action results</summary>
         <p>{outcome.results.filter(item => item.status === "done").length} done, {outcome.results.filter(item => item.status === "failed").length} failed, {outcome.results.filter(item => item.status === "unknown").length} unknown.</p>
         {outcome.results.some(item => item.status !== "done") && <>
           <p>Failed items were not applied. Check your provider and sync before acting on unknown items. No actions were retried.</p>
@@ -172,7 +180,7 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
         </>}
         {outcome.refreshFailed && <p>Refreshing mail failed. Refresh separately to check the cache.</p>}
         <button className="button" onClick={() => setOutcome(null)}>Dismiss results</button>
-      </div>}
+      </details></>)}
       <div inert={pending || !!confirmation || snoozing}>{children}</div>
       {confirmation && createPortal(<Dialog title="Move messages to Trash" onClose={() => setConfirmation(null)}>
         <p>Move exactly {confirmation.length} messages to Trash? Recovery depends on your provider.</p>

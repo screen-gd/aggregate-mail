@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { Fragment, useContext, useEffect, useRef, useState } from "react";
 import type { ContactList, SavedContact } from "../../shared/contacts";
 import type { Account } from "../../shared/types";
@@ -18,11 +19,11 @@ export function ContactsPage({ api, accounts, accountFilter = "all", busy = fals
 function ContactsContent({ api, accounts, accountFilter, busy }: { api: Api; accounts: readonly Account[]; accountFilter: string; busy: boolean }) {
   const { on: privacy } = useContext(PrivacyContext);
   const [contacts, setContacts] = useState<ContactList | null>(null);
-  const [loadError, setLoadError] = useState("");
+  const [loadError, setLoadError] = useFeedbackState();
   const [editing, setEditing] = useState<Editing | null>(null);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [status, setStatus] = useState("");
+  const [error, setError] = useFeedbackState();
+  const [status, setStatus] = useFeedbackState("success");
   const [section, setSection] = useState<"saved" | "recent" | "import">("saved");
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -76,10 +77,9 @@ function ContactsContent({ api, accounts, accountFilter, busy }: { api: Api; acc
   </form>;
   if (!accounts.length) return <p className="muted">Connect an account to save contacts.</p>;
   if (!contacts) return <div className="compose-settings-save">
-    {loadError ? <><p role="alert">{loadError}</p><button type="button" className="button" onClick={() => void load()}>Try again</button></> : <p role="status">Loading contacts</p>}
+    {loadError ? <><Notice text={loadError} /><button type="button" className="button" onClick={() => void load()}>Try again</button></> : <p role="status">Loading contacts</p>}
   </div>;
   const sections = [{ id: "saved", label: "Saved contacts" }, { id: "recent", label: "Recent recipients" }, { id: "import", label: "Import contacts" }] as const;
-  const descriptions = { saved: "People you save or import. Available when you address a message.", recent: "People you have emailed from Emc². Each account keeps its latest 200.", import: "Bring your address book from another service. No developer account or paid service needed." };
   return <main className="settings contacts-page" aria-label="Contacts">
     <label className="settings-mobile-navigation"><span>Contacts section</span><select aria-label="Contacts section" value={section} disabled={disabled}
       onChange={event => { setSection(event.target.value as typeof section); setEditing(null); setError(""); setStatus(""); }}>
@@ -93,11 +93,11 @@ function ContactsContent({ api, accounts, accountFilter, busy }: { api: Api; acc
       </div>
     </nav>
     <div className="settings-column">
-      <header className="settings-section-heading"><span className="settings-section-context">Address book</span><h1>{sections.find(item => item.id === section)!.label}</h1><p>{descriptions[section]}</p></header>
+      <header className="settings-section-heading"><h1>{sections.find(item => item.id === section)!.label}</h1></header>
       {section !== "import" && <label className="contacts-search"><span className="visually-hidden">Find contacts</span><input type="search" placeholder="Find a name or email" value={privacy && !searchFocused ? "" : search} onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)} onChange={event => setSearch(event.target.value)} /></label>}
       {section === "import" && <ContactImportPanel key={accountFilter} api={api} accounts={accounts} accountFilter={accountFilter} busy={disabled} onImported={load} />}
       {section === "saved" && <section>
-    <h2>Saved contacts</h2>
+
     <div className="settings-group">
       {contacts.saved.filter(inAccount).filter(matches).map((contact, index) => <Fragment key={contact.id}>
         <div className="account-row contact-row">
@@ -124,7 +124,7 @@ function ContactsContent({ api, accounts, accountFilter, busy }: { api: Api; acc
     {contacts.saved.length > 0 && !contacts.saved.filter(inAccount).filter(matches).length && <p className="note">No contacts match this view.</p>}
     </section>}
     {section === "recent" && <section>
-    <h2>Recent recipients</h2>
+
     <div className="settings-group">
       {contacts.recent.filter(inAccount).filter(matches).map((recipient, index) => <div className="account-row contact-row" key={recipient.id}>
         <strong><Address value={recipient.email} /></strong>
@@ -137,9 +137,9 @@ function ContactsContent({ api, accounts, accountFilter, busy }: { api: Api; acc
     {contacts.recent.length > 0 && !contacts.recent.filter(inAccount).filter(matches).length && <p className="note">No recent recipients match this view.</p>}
     </section>}
     <div className="compose-settings-save">
-      {loadError && <p role="alert">{loadError} <button type="button" className="link" onClick={() => void load()}>Try again</button></p>}
-      {error && <p role="alert">{error}</p>}
-      {status && <p role="status">{status}</p>}
+      {loadError && <><Notice text={loadError} /><button type="button" className="link" onClick={() => void load()}>Try again</button></>}
+      {error && <Notice text={error} />}
+      {status && <Notice text={status} kind="success" />}
     </div>
     </div>
   </main>;

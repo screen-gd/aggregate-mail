@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import type { RendererMail as Mail } from "../../shared/types";
 import type { Commitment } from "../../shared/workspace";
@@ -20,7 +21,7 @@ export function QuickTrack({ mail, work, privateNames, onEdit, onDone }: { mail:
   const [status, setStatus] = useState<keyof typeof trackingStatuses>(target && target !== "new" && openCommitment(target) ? target.status as keyof typeof trackingStatuses : "needs-reply");
   const [reminder, setReminder] = useState<"keep" | "none" | FollowUpPreset>("keep");
   const [saved, setSaved] = useState(false);
-  const [dateError, setDateError] = useState("");
+  const [dateError, setDateError] = useFeedbackState();
   const [savedId, setSavedId] = useState<string | null>(null);
   const [details, setDetails] = useState(false);
   const form = useRef<HTMLFormElement>(null);
@@ -64,8 +65,8 @@ export function QuickTrack({ mail, work, privateNames, onEdit, onDone }: { mail:
     if (ok) { setSaved(true); if (closeWhenSaved) onDone?.(); }
   };
   return <PrivacyContext.Provider value={{ ...privacy, names: privateNames }}><form ref={form} className="settings-form quick-track" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-    <p className="note">Choose an action to save. You can edit the details whenever you need.</p>
-    {work.error && <p role="alert">{work.error}</p>}
+
+    {work.error && <Notice text={work.error} />}
     {(work.stale || work.reviewRequired) && <div className="work-recovery">
       <button type="button" disabled={work.pending || work.refreshing} onClick={() => void work.refresh()}>Refresh saved work</button>
       {work.reviewRequired && <><p>Inspect the saved deliverables below before continuing. Your earlier save may have succeeded.</p>
@@ -104,8 +105,8 @@ export function QuickTrack({ mail, work, privateNames, onEdit, onDone }: { mail:
             ...(followUpPreset("later", work.now) !== undefined ? [{ id: "later" as const, label: "Today, 5pm" }] : []),
             { id: "tomorrow", label: "Tomorrow, 9am" }, { id: "monday", label: "Monday, 9am" },
           ]} disabled={() => work.blocked || !target || changed} onChange={setReminder} /></div>
-        <p className="note">Reminders bring work back to your attention. They do not mark it complete.</p>
-        {dateError && <p role="alert">{dateError}</p>}
+
+        {dateError && <Notice text={dateError} />}
         <button className="button" disabled={work.blocked || work.refreshing || !target || changed || !title.trim()}>Save tracking</button>
         </>}
       </>}

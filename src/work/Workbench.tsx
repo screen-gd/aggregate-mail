@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { attachmentSize } from "../../shared/attachments";
 import { useCallback, useEffect, useMemo, useRef, useState, useId, type ReactNode } from "react";
 import type { Draft, RendererMail as Mail, RendererState as State, McpSettings } from "../../shared/types";
@@ -41,11 +42,11 @@ export function SourceSelect({ state, selected, onChange, multiple = false, acco
   const visible = [...new Map([...state.messages.filter((mail) => selected.includes(mail.id)), ...matches.slice(0, query.trim() ? 10 : 5)].map((mail) => [mail.id, mail])).values()];
   const { on: privacy } = useContext(PrivacyContext);
   return <fieldset className="work-sources"><legend>{multiple ? "Supporting emails" : "Source email"}</legend>
-    <p className="work-meta">{multiple ? "Link emails that support this item or explain a change." : "Choose the email this work starts from. Only cached emails are listed."}</p>
+    <p className="visually-hidden">{multiple ? "Link emails that support this item or explain a change." : "Choose the email this work starts from. Only cached emails are listed."}</p>
     <details className="work-source-search"><summary>Find more emails</summary>
       <PrivateField label="Find a source email" value={query} onChange={setQuery} />
     </details>
-    <p className="work-meta">{search.error || (search.pending ? "Searching cached mail…" : query.trim() ? `${matches.length} matches. Showing up to 10 plus selected emails.` : "Recent emails first. Selected emails stay visible.")}</p>
+    <p className="visually-hidden">{search.error || (search.pending ? "Searching cached mail…" : query.trim() ? `${matches.length} matches. Showing up to 10 plus selected emails.` : "Recent emails first. Selected emails stay visible.")}</p>
     <div>{selected.filter((id) => !state.messages.some((mail) => mail.id === id)).map((id) => <label key={id}><input type={multiple ? "checkbox" : "radio"} name={multiple ? undefined : sourceGroup} checked onChange={() => { if (multiple) onChange(selected.filter((value) => value !== id)); }} />Selected evidence unavailable in cache</label>)}
     {visible.map((mail) => <MailPrivacy key={mail.id} mail={mail}><label className="work-source-option">
       <input type={multiple ? "checkbox" : "radio"} name={multiple ? undefined : sourceGroup} checked={selected.includes(mail.id)} onChange={() => onChange(multiple ? selected.includes(mail.id) ? selected.filter((id) => id !== mail.id) : [...selected, mail.id] : [mail.id])} />
@@ -63,7 +64,7 @@ function CommitmentForm({ existing, draft, state, projects, source, accountFilte
   const [status, setStatus] = useState<CommitmentStatus>(draft?.status ?? existing?.status ?? "needs-reply");
   const [date, setDate] = useState(existing ? deadlineDate(existing) || "" : "");
   const [followUp, setFollowUp] = useState((draft ?? existing)?.followUpAt === undefined ? "" : localTimeInput((draft ?? existing)!.followUpAt!));
-  const [dateError, setDateError] = useState("");
+  const [dateError, setDateError] = useFeedbackState();
   const [sourceIds, setSources] = useState(existing ? [existing.sourceMailId] : source ? [source] : []);
   const [evidence, setEvidence] = useState(existing?.evidenceMailIds || (source ? [source] : []));
   const [projectId, setProjectId] = useState(existing?.projectId || draft?.projectId || "");
@@ -80,9 +81,9 @@ function CommitmentForm({ existing, draft, state, projects, source, accountFilte
     await onSave({ ...(existing ? { revision: existing.revision } : { sourceMailId: mail!.id, accountId: mail!.accountId }), text, reason, status,
       dueDate: date || (existing ? null : undefined), followUpAt: followUpAt ?? (existing ? null : undefined), evidenceMailIds: evidence, projectId: projectId || (existing ? null : undefined) });
   }}>
-    <p className="work-meta">Write down work you choose to track. Review the details, then save it explicitly.</p>
+
     {!existing && <fieldset className="work-templates"><legend>Start with a template (optional)</legend>
-      <p className="work-meta">Choose a starting point, then edit the action, status and reason. Nothing is saved yet.</p>
+
       <div className="work-controls">{([
         ["needs-reply", "Reply to this email", "Reply to", "reply"],
         ["needs-work", "Do a task", "Task for", "task"],
@@ -95,16 +96,16 @@ function CommitmentForm({ existing, draft, state, projects, source, accountFilte
     </fieldset>}
     <PrivateField label="What needs to happen" value={text} onChange={setText} required maxLength={1000} />
     <PrivateField label="Why track this or change it" value={reason} onChange={setReason} required multiline maxLength={2000} />
-    <p className="work-meta">Explain why it matters or what changed. This reason stays in the item history.</p>
+
     <label>Status<select value={status} onChange={(event) => setStatus(event.target.value as CommitmentStatus)}>{Object.entries(statusNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     <div className="work-form-dates"><label>Due date<input type="date" min="0001-01-01" max="9999-12-31" value={date} onChange={(event) => setDate(event.target.value)} /></label>
     <label>Reminder<input type="datetime-local" min="1970-01-01T00:00" max="9999-12-31T23:59" value={followUp} onChange={(event) => setFollowUp(event.target.value)} /></label></div>
-    <p className="note">Optional. Due date is the day the work is due. Reminder is when to look again, in local time; it never completes the work.</p>
-    {dateError && <p role="alert">{dateError}</p>}
+
+    {dateError && <Notice text={dateError} />}
     <label>Project<select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">None</option>{projects.filter((project) => !existing || project.accountIds.includes(existing.accountId)).map((project, index) => <option key={project.id} value={project.id}>{privacy ? `Project ${index + 1}` : project.name}</option>)}</select></label>
     {!existing && <SourceSelect state={state} selected={sourceIds} onChange={(ids) => { setSources(ids); setEvidence(ids); }} accountFilter={accountFilter} />}
     {existing && <SourceSelect state={state} selected={evidence} onChange={setEvidence} multiple accountFilter={existing?.accountId || state.messages.find((mail) => mail.id === sourceIds[0])?.accountId || accountFilter} />}
-    <p className="note">Confirm changes to this item only. Reading, replying and archiving never complete it.</p>
+
     <div className="form-actions"><button type="button" onClick={onCancel} disabled={pending}>Cancel</button><button className="button" disabled={pending || !sourceIds.length || !evidence.length}>{existing ? "Confirm changes" : "Confirm commitment"}</button></div>
   </form>;
 }
@@ -116,7 +117,7 @@ function ProjectForm({ existing, state, accountFilter, pending, onSave, onCancel
   const accounts = [...new Set(sources.map((id) => state.messages.find((mail) => mail.id === id)?.accountId).filter((id): id is string => !!id))];
   const { on: privacy } = useContext(PrivacyContext);
   return <form className="settings-form work-form" onSubmit={async (event) => { event.preventDefault(); if (accounts.length > 1 && !confirmed) return; await onSave({ name, sourceMailIds: sources, ...(existing ? { revision: existing.revision } : {}), confirmAccountIds: confirmed ? accounts : undefined }); }}>
-    <p className="work-meta">Choose a name and at least one email. You can find more emails below.</p>
+
     <PrivateField label="Project name" value={name} onChange={setName} required maxLength={200} />
     <SourceSelect state={state} selected={sources} onChange={(ids) => { setSources(ids); setConfirmed(false); }} multiple accountFilter={accountFilter} />
     {accounts.length > 1 && <label><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />I approve linking these accounts in this project: <Redact text={accounts.map((id) => { const i = state.accounts.findIndex((account) => account.id === id); return accountLabel(state.accounts[i], i, privacy); }).join(", ")} /></label>}
@@ -128,7 +129,7 @@ function OpenCodeSetup({ token, enabled, api, onEnabled, onNotice }: {
   token: string; enabled: boolean; api: Api; onEnabled: () => void; onNotice: (text: string) => void;
 }) {
   const [phase, setPhase] = useState<"idle" | "pending" | "saved">("idle");
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const [copied, setCopied] = useState(false);
   const [copyEndpoint, setCopyEndpoint] = useState("");
   useEffect(() => {
@@ -185,7 +186,7 @@ function OpenCodeSetup({ token, enabled, api, onEnabled, onNotice }: {
       {phase === "pending" && <span role="status">Saving…</span>}
       {phase === "saved" && <span role="status">Setup saved. Restart OpenCode on this computer.</span>}
     </div>}
-    {error && <p role="alert">{error}</p>}
+    {error && <Notice text={error} />}
     <details className="work-opencode-manual">
       <summary>Advanced: manual setup</summary>
       <p className="work-meta">Copy this config if the one-button setup cannot run. If you have no user config yet, save the copied JSON as one (<code>~/.config/opencode/opencode.json</code>, or an existing <code>opencode.jsonc</code>). If you already have one, add only the copied <code>mcp.emc2</code> entry to its <code>mcp</code> object, never the whole root. Never use a project config. Keep the app running, restart OpenCode and run <code>opencode mcp list</code>. The copied config contains this grant's credential, so keep it private.</p>
@@ -218,7 +219,7 @@ export function Workbench({ mode, state, api, work, accountFilter, initialSource
   const [eventEditor, setEventEditor] = useState<{ fields: EventFields; existing?: CalendarEvent; id: string } | null>(null);
   const [eventDirty, setEventDirty] = useState(false);
   const [eventDelete, setEventDelete] = useState<CalendarEvent | null>(null);
-  const [deleteError, setDeleteError] = useState("");
+  const [deleteError, setDeleteError] = useFeedbackState();
   const calendarOrigin = useRef<HTMLElement | null>(null);
   const calendarMain = useRef<HTMLDivElement>(null);
   const eventPanel = useRef<HTMLElement>(null);
@@ -230,7 +231,7 @@ export function Workbench({ mode, state, api, work, accountFilter, initialSource
   const selectedRow = useRef<HTMLButtonElement | null>(null);
   const workContent = useRef<HTMLDivElement>(null);
   const restoreListFocus = useRef(false);
-  const taskNotice = useRef<HTMLParagraphElement | null>(null);
+  const taskNotice = useRef<HTMLSpanElement | null>(null);
   const completionFocus = useRef<{ origin: HTMLElement; nearby: HTMLElement[] } | null>(null);
   const [taskStatus, setTaskStatus] = useState("");
   useEffect(() => {
@@ -396,7 +397,7 @@ export function Workbench({ mode, state, api, work, accountFilter, initialSource
   const calendarPane = mode === "calendar" && (readerOpened
     ? <aside className="work-inspector calendar-reader" aria-label="Calendar reading pane">{reader || <p role="status">Opened email unavailable in cache. <button type="button" onClick={onCloseReader}>Back to calendar</button></p>}</aside>
     : selectedEvent ? <EventDetail ref={eventPanel} event={selectedEvent} state={state} pending={calendar.pending} api={api} google={calendar.google.some((value) => value.accountId === selectedEvent.accountId && value.status === "connected")} onOpenDraft={onOpenDraft} onChanged={calendar.refresh}
-      sessionActions={selectedEvent.workSession ? <><p className="note">Local calendar conflicts only. Google calendars are excluded. Task dates and completion remain independent.</p>{sessions.error && <p role="alert">{sessions.error}</p>}{sessions.value && !sessions.value.available && <p role="alert">{sessions.value.reason}</p>}<SessionActions event={sessions.value?.sessions.find(event => event.id === selectedEvent.id) || selectedEvent} parent={sessionParent} sessions={sessions} disabled={blocked} /></> : undefined}
+      sessionActions={selectedEvent.workSession ? <><p className="note">Local calendar conflicts only. Google calendars are excluded. Task dates and completion remain independent.</p>{sessions.error && <Notice text={sessions.error} />}{sessions.value && !sessions.value.available && <Notice text={sessions.value.reason} />}<SessionActions event={sessions.value?.sessions.find(event => event.id === selectedEvent.id) || selectedEvent} parent={sessionParent} sessions={sessions} disabled={blocked} /></> : undefined}
       source={selectedEvent.sourceMailId ? <Source id={selectedEvent.sourceMailId} state={state} onOpen={onOpen} /> : undefined}
       onClose={closeEvent} onEdit={() => setEventEditor({ fields: eventFields(selectedEvent), existing: selectedEvent, id: selectedEvent.id })}
       onDelete={() => { setDeleteError(""); setEventDelete(selectedEvent); }} /> : detail);
@@ -411,7 +412,7 @@ export function Workbench({ mode, state, api, work, accountFilter, initialSource
         {mode === "actions" && <nav className="work-view-tabs" aria-label="Work status">{([['open', 'Open'], ['waiting', 'Waiting'], ['completed', 'Completed']] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={workFilter === value} onClick={() => setWorkFilter(value)}>{label}<span className="work-tab-count">{value === "open" ? openCount : commitments.filter(item => value === "waiting" ? item.status === "waiting" : !openCommitment(item)).length}</span></button>)}</nav>}
         {mode === "projects" ? <div className="project-filters" role="group" aria-label="Choose a project">{projects.map((project, index) =>
           <button type="button" key={project.id} disabled={blocked} aria-pressed={projectId === project.id} onClick={() => { setProjectId(project.id); closeProjectReader(); setDecision(""); setDecisionSources([]); }}><Redact text={privacy ? `Project ${index + 1}` : project.name} /></button>
-        )}</div> : mode === "assistants" || mode === "actions" ? null : <p className="work-intro">{mode === "agents" ? "Review changes before they run." : mode === "calendar" ? "Events, tracked work, follow-ups and snoozed mail" : `${openCount} ${stale ? "cached " : ""}open ${openCount === 1 ? "task" : "tasks"}`}</p>}
+        )}</div> : null}
         <div className="work-controls"><button type="button" disabled={pending || work.refreshing} aria-label="Refresh workspace" onClick={() => void load()}>Refresh</button>{(mode === "actions" || mode === "calendar") && <button className="button" type="button" disabled={blocked} onClick={() => setEditor("new")}>Add task</button>}{mode === "projects" && <>
           <button type="button" disabled={blocked} onClick={() => setProjectEditor("new")}>New project</button>
           {selectedProject && <><button type="button" disabled={blocked} onClick={() => setProjectEditor(selectedProject)}>Edit project / add emails</button><button className="button" type="button" disabled={blocked} onClick={() => { setDraft({ projectId: selectedProject.id }); setEditor("new"); }}>Add task</button></>}
@@ -422,16 +423,16 @@ export function Workbench({ mode, state, api, work, accountFilter, initialSource
         onChange={setAgentTab} /></div>}
     </>)}
     <div ref={workContent} tabIndex={-1} className={`work-content work-${mode}${mode === "actions" || mode === "projects" ? " today-content" : ""}`}>
-    {taskStatus && <p ref={taskNotice} tabIndex={-1} role="status" className="work-meta">{taskStatus}</p>}
-    {error && !editor && <p role="alert">{error}</p>}
-    {(mode === "agents" || mode === "assistants") && agentError && <p role="alert">{agentError}</p>}
+    {taskStatus && <><Notice text={taskStatus} kind="info" /><span ref={taskNotice} tabIndex={-1} className="visually-hidden">{taskStatus}</span></>}
+    {error && !editor && <Notice text={error} />}
+    {(mode === "agents" || mode === "assistants") && agentError && <Notice text={agentError} />}
     {!loaded && !error && <p role="status">Loading confirmed work…</p>}
     {stale && loaded && <p role="status">Cached work is shown. Editing is paused until a successful refresh.</p>}
     {work.reviewRequired && <div className="work-recovery" role="alert"><p>The previous change has an unknown outcome. Refresh and inspect saved work before continuing.</p><button type="button" disabled={stale || work.refreshing || pending} onClick={work.acknowledgeReview}>I reviewed saved work</button></div>}
     {loaded && <fieldset className="work-editing" disabled={mode !== "actions" && mode !== "calendar" && (blocked || (mode === "agents" || mode === "assistants") && agentStale)}>
       {(mode === "actions" || mode === "calendar") && <>
-        {mode === "calendar" && calendar.error && <p role="alert">{calendar.error}</p>}
-        {mode === "calendar" && <><p className="work-meta" role="status">{calendarStatus}</p><GoogleCalendar state={state} calendar={calendar} api={api} months={calendarMonths} accountFilter={accountFilter} /></>}
+        {mode === "calendar" && calendar.error && <Notice text={calendar.error} />}
+        {mode === "calendar" && <><Notice text={calendarStatus} kind="info" /><GoogleCalendar state={state} calendar={calendar} api={api} months={calendarMonths} accountFilter={accountFilter} /></>}
         <div className={`work-layout${detailOpen || readerOpened || mode === "calendar" && selectedEvent ? " has-selection" : ""}${mode === "actions" ? " today-layout" : ""}${readerOpened ? " has-reader" : ""}${fullReading ? " full-reading" : ""}`}><div className="work-main" ref={calendarMain}>
           {mode === "calendar" ? <Calendar items={commitments} messages={state.messages.filter((mail) => (accountFilter === "all" || mail.accountId === accountFilter) && state.accounts.some((account) => account.id === mail.accountId))}
             events={visibleEvents} now={now} selectedEventId={selectedEvent?.id} jump={calendarJump} onRangeChange={setCalendarRange}
@@ -453,7 +454,7 @@ export function Workbench({ mode, state, api, work, accountFilter, initialSource
             {workFilter !== "completed" && <details><summary>Completed and cancelled ({sorted.filter((item) => !openCommitment(item)).length})</summary>{sorted.filter((item) => !openCommitment(item)).map(itemRow)}</details>}
           </>}
         </div>{mode === "actions" ? <aside className="today-reader" aria-label="Today reading pane">
-          {!detailOpen && !readerOpened && <div className="work-context"><span className="context-label">Your workspace</span><h2>Confirmed work</h2><p>Commitments and their source conversations, kept together.</p><dl><dt>Open</dt><dd>{openCount}</dd><dt>Waiting</dt><dd>{sorted.filter((item) => item.status === "waiting").length}</dd><dt>Projects</dt><dd>{projects.length}</dd></dl><p className="work-meta">Select a task to inspect its details and read its source email.</p></div>}
+
           {detail}
           {readerOpened ? reader || <p role="status">Opened source unavailable in cache. <button type="button" onClick={onCloseReader}>Back to work list</button></p> : selected && detailOpen ? <p role="status">{state.messages.some((mail) => mail.id === selected.sourceMailId && state.accounts.some((account) => account.id === mail.accountId)) ? "Open a source above to read its email." : "Source unavailable in cache. The commitment and its evidence history remain available."}</p> : <p className="work-reader-empty">Select work to read its email here.</p>}
         </aside> : mode === "calendar" ? calendarPane : detail}</div>
@@ -554,12 +555,12 @@ export function Workbench({ mode, state, api, work, accountFilter, initialSource
             catch { onNotice("Saved to Drafts. Open it from Drafts to edit and send."); }
           }
         }} /></div>)}
-        </div><aside className="agent-review-context"><span className="context-label">Review controls</span><h2>Proposed mail changes</h2><p>Review the account, target and exact action before approving a proposal.</p><dl><dt>Pending</dt><dd>{workspace.proposals.filter((item) => item.status === "pending").length}</dd><dt>Assistants</dt><dd>{grants.length}</dd></dl>{onManageAssistants && <button type="button" onClick={onManageAssistants}>Manage permissions</button>}<p className="work-meta">Separate grants may allow local project or commitment creation without review. Manage those permissions in Settings.</p></aside></div>}
+        </div><details className="agent-review-help"><summary>About review and permissions</summary><p>Review the account, target and exact action before approving a proposal.</p><p className="work-meta">Separate grants may allow local project or commitment creation without review. Manage those permissions in Settings.</p></details></div>}
       </>}
       {mode !== "agents" && mode !== "assistants" && <details className="coverage"><summary>Sent and thread coverage · cached evidence may be incomplete</summary><p>Cached conversations are evidence, not a complete mailbox. Fetches are explicit and bounded. Coverage timestamps can become stale.</p>{state.accounts.filter((account)=>accountFilter==="all"||account.id===accountFilter).map((account,index)=>{const coverage=workspace.coverage.find((item)=>item.accountId===account.id);return <div key={account.id}><p><Redact text={accountLabel(account,index,privacy)} />: {coverage?`${coverage.count} Sent messages · checked ${new Date(coverage.observedAt).toLocaleString()} · limit ${coverage.bound}${coverage.truncated?" · more messages omitted":""}${coverage.error?" · last attempt failed":""}`:"Sent has not been checked"}</p><button type="button" disabled={blocked} onClick={()=>void mutate(async()=>{await api(`/accounts/${encodeURIComponent(account.id)}/sent/sync`,"POST",{bound:50});await onMailChanged();})}>Fetch up to 50 Sent messages</button></div>;})}</details>}
     </fieldset>}
       {projectEditor && <Dialog title={projectEditor === "new" ? "New project" : "Edit project"} onClose={() => { if (!pending) setProjectEditor(null); }}>
-        {error && <p role="alert">{error}</p>}
+        {error && <Notice text={error} />}
         {(stale || acknowledged.current || work.reviewRequired) && <button type="button" disabled={pending || work.refreshing} onClick={() => void load()}>Refresh saved work</button>}
         {work.reviewRequired && <button type="button" disabled={stale || pending || work.refreshing} onClick={work.acknowledgeReview}>I reviewed saved work</button>}
         <fieldset className="work-editing" disabled={blocked || acknowledged.current}><ProjectForm key={projectEditor === "new" ? "new" : projectEditor.id} existing={projectEditor === "new" ? undefined : projectEditor} state={state} accountFilter={accountFilter} pending={pending} onCancel={() => setProjectEditor(null)} onSave={async (input) => {
@@ -568,7 +569,7 @@ export function Workbench({ mode, state, api, work, accountFilter, initialSource
         }} /></fieldset>
       </Dialog>}
       {editor && <Dialog title={editor === "new" ? "Add task" : "Edit task"} onClose={() => { if (!pending) { setEditor(null); setDraft(undefined); } }}>
-        {error && <p role="alert">{error}</p>}
+        {error && <Notice text={error} />}
         {(stale || work.reviewRequired || acknowledged.current) && <button type="button" disabled={pending || work.refreshing} onClick={() => void load()}>Refresh saved work</button>}
         {work.reviewRequired && <div className="work-recovery"><p>Review the refreshed saved work. The earlier save may already exist.</p><ul>{commitments.map((item) => <li key={item.id}><Redact text={item.text} /> · {statusNames[item.status]} · revision {item.revision}</li>)}</ul><button type="button" disabled={stale || work.refreshing || pending} onClick={work.acknowledgeReview}>I reviewed saved work</button></div>}
         {editor !== "new" && workspace.commitments.find((item) => item.id === editor.id)?.revision !== editor.revision && <p role="alert">This deliverable changed or was removed. Close this editor and review the current saved item before editing again. Your earlier input is retained here.</p>}
@@ -580,7 +581,7 @@ export function Workbench({ mode, state, api, work, accountFilter, initialSource
       </Dialog>}
       {eventDelete && <Dialog title="Delete event" onClose={closeDelete}>
         <p className="dialog-copy">Delete this event from your Emc² calendar? This cannot be undone. No cancellation is sent to attendees.</p>
-        {deleteError && <p role="alert">{deleteError}</p>}
+        {deleteError && <Notice text={deleteError} />}
         <div className="form-actions">
           <button type="button" className="button" disabled={calendar.pending} onClick={closeDelete}>Cancel</button>
           <button type="button" className="button trash-action" disabled={calendar.pending} aria-busy={calendar.pending} onClick={() => void deleteEvent()}>{calendar.pending ? "Deleting…" : "Delete event"}</button>

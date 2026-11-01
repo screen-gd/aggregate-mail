@@ -6,12 +6,13 @@ import type { Mail } from "../shared/types";
 import type { Api } from "./api";
 import { BulkMailSelection } from "./mail/BulkMailSelection";
 import { MailList } from "./mail/MailList";
+import { NotificationContext } from "./ui/Toasts";
 
 const messages: Mail[] = Array.from({ length: 250 }, (_, index) => ({ id: `local-${index}`, accountId: index % 2 ? "b" : "a", remoteId: String(index),
   sender: "Synthetic", address: "sender@example.test", to: "reader@example.test", subject: `Subject ${index}`,
   body: "", preview: "", date: 1, unread: true, archived: false, category: "important", relevance: 2, reason: "", snoozedUntil: null }));
 const noop = () => {};
-async function mount(api: Api = async <T,>() => ({ results: [] } as T), reload = async () => {}, selectionShortcut?: (event: KeyboardEvent) => "toggle" | "range" | null, syncing = false) {
+async function mount(api: Api = async <T,>() => ({ results: [] } as T), reload = async () => {}, selectionShortcut?: (event: KeyboardEvent) => "toggle" | "range" | null, syncing = false, push: ((text: string, kind?: "info" | "success" | "error") => void) | null = null) {
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: "http://localhost/" });
   const previous = new Map<string, PropertyDescriptor | undefined>();
   for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true })) {
@@ -22,16 +23,16 @@ async function mount(api: Api = async <T,>() => ({ results: [] } as T), reload =
   const root = createRoot(document.getElementById("root")!);
   const ref = createRef<HTMLDivElement>();
   let opened = 0;
-  function Harness({ items, scope }: { items: Mail[]; scope: string }) {
+  function Harness({ items, scope, active }: { items: Mail[]; scope: string; active: boolean }) {
     const [cursor, setCursor] = useState(items[0]?.id);
-    return <div ref={ref} className="list"><BulkMailSelection messages={items} accounts={[
+    return <NotificationContext.Provider value={push}><div ref={ref} className="list"><BulkMailSelection active={active} messages={items} accounts={[
       { id: "a", email: "a@example.test", provider: "imap" }, { id: "b", email: "b@example.test", provider: "imap" },
     ]} scope={scope} selectedId={cursor} onSelect={setCursor} api={api} reload={reload} disabled={false} syncing={syncing} onBlockingChange={noop} selectionShortcut={selectionShortcut}>
       <MailList messages={items} accounts={[]} listRef={ref} selectedId={cursor} focusSelection={true} density="comfortable" narrow={false} sort="relevance"
         opening="single" onSelect={setCursor} onOpen={() => { opened++; }} onMenu={noop} onMenuKey={noop} />
-    </BulkMailSelection></div>;
+    </BulkMailSelection></div></NotificationContext.Provider>;
   }
-  const render = async (items = messages, scope = "inbox") => act(async () => root.render(<Harness items={items} scope={scope} />));
+  const render = async (items = messages, scope = "inbox", active = true) => act(async () => root.render(<Harness items={items} scope={scope} active={active} />));
   await render();
   const button = (text: string) => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === text)!;
   const click = async (text: string) => act(async () => button(text).click());
@@ -116,6 +117,21 @@ test("response loss marks every item unknown and cache refresh failure does not 
   } finally { await ui.close(); }
 });
 
+test("a bulk success toast is published once per action and not replayed when a message closes", async () => {
+  const toasts: string[] = [];
+  const ok: Api = async <T,>(_path: string, _method?: string, body?: unknown) =>
+    ({ results: (body as { items: Mail[] }).items.map(item => ({ ...item, status: "done" })) } as T);
+  const ui = await mount(ok, async () => {}, undefined, false, (text, kind) => { if (kind === "success") toasts.push(text); });
+  try {
+    await ui.render(messages.slice(0, 3)); await act(async () => ui.master().click()); await ui.click("Done");
+    assert.deepEqual(toasts, ["3 messages updated."]);
+    await ui.render(messages.slice(0, 3), "inbox", false); await ui.render(messages.slice(0, 3), "inbox", true);
+    assert.deepEqual(toasts, ["3 messages updated."], "closing a message does not repeat the toast");
+    await act(async () => ui.master().click()); await ui.click("Done");
+    assert.deepEqual(toasts, ["3 messages updated.", "3 messages updated."], "an equal-sized second action still confirms");
+  } finally { await ui.close(); }
+});
+
 test("platform select-all works anywhere on a mail page but leaves fields, dialogs and the other modifier alone", async () => {
   const ui = await mount();
   const press = (target: EventTarget, init: KeyboardEventInit) => act(async () => {
@@ -156,11 +172,9 @@ test("select-all over Sent mail offers only the actions Sent supports", async ()
     await ui.render(messages.slice(0, 3).map(mail => ({ ...mail, direction: "sent" as const })), "sent");
     await ui.key("local-0", "a", { ctrlKey: true });
     assert.match(ui.count()!, /^3 messages selected/);
-    assert.equal(ui.button("Mark as read").disabled, true);
-    assert.equal(ui.button("Archive").disabled, true);
+    assert.deepEqual([...document.querySelectorAll(".rail-tools button")].map(button => button.textContent), ["Pin", "Unpin", "Move to Trash"]);
     assert.equal(ui.button("Pin").disabled, false);
     assert.equal(ui.button("Move to Trash").disabled, false);
-    assert.match(document.getElementById(ui.button("Mark as read").getAttribute("aria-describedby")!)!.textContent!, /Sent mail supports Pin, Unpin and Move to Trash only/);
   } finally { await ui.close(); }
 });
 
@@ -245,12 +259,13 @@ test("a 200-item range outside the first batch reads mixed, and the master then 
       list.scrollTop = top;
       list.dispatchEvent(new ui.dom.window.Event("scroll"));
     });
-    await scrollTo(1600);
+    const rowHeight = parseFloat(document.querySelector<HTMLElement>(".mail-window")!.style.height) / messages.length;
+    await scrollTo(50 * rowHeight);
     const middle = document.querySelector<HTMLButtonElement>('[data-mail-id="local-50"] [role="checkbox"]');
     assert.ok(middle, "row local-50 mounts once the window scrolls to it");
     await act(async () => middle.click());
     assert.match(ui.count()!, /^1 messages selected/);
-    await scrollTo(8100);
+    await scrollTo(249 * rowHeight);
     const last = document.getElementById("mail-local-249");
     assert.ok(last, "row local-249 mounts once the window scrolls to it");
     await act(async () => last.dispatchEvent(new ui.dom.window.MouseEvent("click", { shiftKey: true, bubbles: true })));
@@ -259,5 +274,21 @@ test("a 200-item range outside the first batch reads mixed, and the master then 
     await act(async () => ui.master().click());
     assert.match(ui.count()!, /^200 messages selected/);
     assert.equal(ui.master().getAttribute("aria-checked"), "true", "the master selects the first 200");
+  } finally { await ui.close(); }
+});
+
+
+test("checkbox toggles do not rescan an unchanged large mailbox", async () => {
+  const ui = await mount();
+  let reads = 0;
+  const large = Array.from({ length: 20_000 }, (_, index) => ({ ...messages[0],
+    get id() { reads++; return `large-${index}`; },
+  }));
+  try {
+    await ui.render(large);
+    reads = 0;
+    await act(async () => document.querySelector<HTMLButtonElement>('.mail-row [role="checkbox"]')!.click());
+    assert.match(ui.count()!, /^1 messages selected/);
+    assert.ok(reads < 1_000, `a local toggle read ${reads} message identities`);
   } finally { await ui.close(); }
 });

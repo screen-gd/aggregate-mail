@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useContext, useEffect, useRef, useState } from "react";
 import type { Draft, Mail } from "../../shared/types";
 import type { Api } from "../api";
@@ -14,7 +15,7 @@ export function UnsubscribeAction({ mail, api, busy, onOpenDraft, onReviewing }:
   const [revealed, setRevealed] = useState(false);
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<Result>();
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const lock = useRef(false);
   useEffect(() => { if (privacy) setRevealed(false); }, [privacy]);
   useEffect(() => { onReviewing?.(open); return () => onReviewing?.(false); }, [open, onReviewing]);
@@ -45,8 +46,8 @@ export function UnsubscribeAction({ mail, api, busy, onOpenDraft, onReviewing }:
         action.kind === "mailto" ? "Create a normal draft from this email’s receiving account. Review its recipient, subject and body before sending. Nothing is sent now." :
         "Check the destination, then open its unsubscribe page in your system browser. The browser controls later navigation and may send its own cookies."}</p>
       <p className="dialog-copy">The destination was supplied by the sender and has not been authenticated. Continue only if you trust it. It may identify your subscription.</p>
-      {error && <p role="alert">{error}</p>}
-      {result?.kind === "sent" && <p role="status">Unsubscribe request accepted. The sender controls when mail stops.</p>}
+      {error && <Notice text={error} />}
+      {result?.kind === "sent" && <Notice kind="success" text="Unsubscribe request accepted. The sender controls when mail stops." />}
       <div className="form-actions">
         <button type="button" className="button" disabled={pending} onClick={close}>{result || error ? "Close" : "Cancel"}</button>
         {!result && !error && <button type="button" className="button" disabled={pending || hidden} onClick={() => void confirm()}>

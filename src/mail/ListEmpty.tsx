@@ -30,10 +30,10 @@ export function ListEmpty({ loaded, hasAccounts, filtered, title, viewName, sync
             Connect an account <ArrowRight color="currentColor" size={11} />
           </button>
         ) : searchPending ? (
-          <p>Searching message bodies. Header matches appear as soon as they are available.</p>
+          null
         ) : filtered ? (
           <>
-            <p>No cached mail{includesDrafts ? " or saved drafts" : ""} matches these controls in {viewName}.</p>
+
             {onWiden && <button type="button" className="link" onClick={onWiden}>{widenLabel}</button>}
             <button type="button" className="link" onClick={onReset}>Reset filters and sort</button>
           </>

@@ -33,7 +33,7 @@ export function phonePasskeys(options: {
   const { gate } = options;
   gate.trustPairedBrowsers({ list: options.list, save: options.save });
   const now = options.now || Date.now;
-  let pairing: (PhonePairing & { origin: string; epoch: number; inviteHash?: string; claimHash?: string; challenge?: string; userId?: string; verifying?: boolean }) | undefined;
+  let pairing: (PhonePairing & { origin: string; epoch: number; inviteHash?: string; approvedOnClaim?: boolean; claimHash?: string; challenge?: string; userId?: string; verifying?: boolean }) | undefined;
   const ceremonies = new Map<string, { challenge: string; origin: string; epoch: number; expiresAt: number }>();
   const authenticating = new Set<string>();
   let attemptStart = now(), attempts = 0;
@@ -65,10 +65,10 @@ export function phonePasskeys(options: {
       ...(value ? { pairing: { id: value.id, phase: value.phase, code: value.code, expiresAt: value.expiresAt } } : {}) };
   };
   const auth = express.Router();
-  auth.get("/auth/passkey.js", (_req, res) => res.sendFile(path.resolve(process.env.MAIL_STATIC_DIR || "dist", "auth-passkey.js")));
+  auth.get("/auth/passkey.js", (_req, res) => res.sendFile("auth-passkey.js", { root: path.resolve(process.env.MAIL_STATIC_DIR || "dist") }));
   auth.get("/auth/pair", (req, res) => {
     try { remote(req); } catch { return res.status(403).send("Open the private phone address from the QR code."); }
-    res.type("html").send(browserAuthPage("Connect phone to Emc²", `<h1>Connect this phone</h1><p>One approval. Then unlock with your screen lock.</p><p id="passkey-status" role="status" aria-live="polite">Checking invitation…</p><p id="pair-code" aria-label="Matching code"></p><button type="button" id="passkey-connect" hidden>Connect this device</button><button type="button" id="passkey-register" disabled>Save passkey and open inbox</button><ol class="steps"><li>Compare this code with the host.</li><li>Approve this device on the host.</li><li>Save a passkey using your screen lock.</li></ol><a class="secondary" href="/auth#first-time">Back to unlock and setup help</a>`));
+    res.type("html").send(browserAuthPage("Connect phone to Emc²", `<h1>Connect this phone</h1><p>One approval. Then unlock with your screen lock.</p><p id="passkey-status" role="status" aria-live="polite">Checking invitation…</p><p id="pair-code" aria-label="Matching code"></p><button type="button" id="passkey-connect" hidden>Connect this device</button><button type="button" id="passkey-register" disabled>Save passkey and open inbox</button><ol class="steps" id="pair-steps"><li>Compare this code with the host.</li><li>Approve this device on the host.</li><li>Save a passkey using your screen lock.</li></ol><a class="secondary" href="/auth#first-time">Back to unlock and setup help</a>`));
   });
   auth.use("/auth/passkey", (req, res, next) => {
     try { remote(req); if (req.method !== "POST" || req.headers.origin !== gate.phoneOrigin()) throw new Error("origin"); next(); }
@@ -97,11 +97,13 @@ export function phonePasskeys(options: {
     const value = pending();
     if (!value || value.phase !== "waiting" || typeof req.body?.token !== "string" || req.body.token.length !== 43 || hash(req.body.token) !== value.inviteHash) throw new Error("invite");
     const token = secret();
-    value.inviteHash = undefined; value.claimHash = hash(token); value.phase = "claimed";
+    value.inviteHash = undefined; value.claimHash = hash(token);
+    value.phase = value.approvedOnClaim ? "approved" : "claimed";
+    value.approvedOnClaim = undefined;
     value.code = String(randomInt(100000, 1000000));
     // Scanning consumes the short-lived invitation; allow time for host approval and the OS prompt.
     value.expiresAt = now() + 10 * 60_000;
-    res.cookie(claimCookie, token, { ...cookieOptions, maxAge: 10 * 60_000 }).json({ code: value.code, approved: false });
+    res.cookie(claimCookie, token, { ...cookieOptions, maxAge: 10 * 60_000 }).json({ code: value.code, approved: value.phase === "approved" });
   });
   post("pair/status", async (req, res) => {
     const value = claim(req);
@@ -184,14 +186,15 @@ export function phonePasskeys(options: {
         try {
           const value = pending();
           switch (req.params.action) {
+            case "setup-link":
             case "connect": {
               const origin = gate.phoneOrigin();
               if (!origin || options.list().length >= 8) throw new Error("unavailable");
               const token = secret();
-              const next = { id: randomBytes(16).toString("hex"), origin, epoch: gate.phoneEpoch(), expiresAt: now() + 120_000, phase: "waiting" as const, inviteHash: hash(token) };
+              const next = { id: randomBytes(16).toString("hex"), origin, epoch: gate.phoneEpoch(), expiresAt: now() + 120_000, phase: "waiting" as const, inviteHash: hash(token), approvedOnClaim: req.params.action === "setup-link" };
               pairing = next;
               const url = `${origin}/auth/pair#${token}`;
-              const qr = await QRCode.toDataURL(url, { errorCorrectionLevel: "M", width: 240, margin: 2 });
+              const qr = next.approvedOnClaim ? undefined : await QRCode.toDataURL(url, { errorCorrectionLevel: "M", width: 240, margin: 2 });
               if (pending() !== next) throw new Error("cancelled");
               res.json({ ...snapshot(), pairing: { ...snapshot().pairing!, qr, url } }); return;
             }

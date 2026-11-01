@@ -1,7 +1,8 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  accents, modes, readingLayouts, supportsGlass, themes, transparencyChoices,
+  accents, modes, readingLayouts, readerToolbars, supportsGlass, themes, transparencyChoices,
   type Appearance, type Scheme,
 } from "../appearance";
 import {
@@ -35,7 +36,7 @@ export function AppearanceSettings({ value, scheme, onChange, onPreview = noPrev
     onModalChange?.(dialogOpen);
     return () => onModalChange?.(false);
   }, [dialogOpen, onModalChange]);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const selected = value.customThemes.find((theme) => theme.id === value.theme);
   const full = value.customThemes.length >= maxCustomThemes;
   const close = () => { onModalChange?.(false); setDialog(null); setError(""); };
@@ -136,8 +137,8 @@ export function AppearanceSettings({ value, scheme, onChange, onPreview = noPrev
             <button type="button" className="button" onClick={() => exportTheme(selected)}>Export theme</button>
             <button type="button" className="button" onClick={() => setDialog({ kind: "delete", theme: selected })}>Delete theme</button>
           </div>}
-          <p className="note">Custom themes include light and dark palettes and their own accent. Saved on this device.</p>
-          {error && <p className="theme-error" role="alert">{error}</p>}
+
+          {error && <Notice text={error} />}
         </div>
         {!selected && <div className="settings-row">
           <span id="accent-label">Accent</span>
@@ -175,28 +176,26 @@ export function AppearanceSettings({ value, scheme, onChange, onPreview = noPrev
             value={value.glassOpacity} aria-valuetext={`${value.glassOpacity} percent`}
             disabled={!glass || value.transparency === "off"} aria-describedby="window-opacity-help"
             onChange={(event) => onChange({ ...value, glassOpacity: event.target.valueAsNumber })} />
-          <p id="window-opacity-help" className="note">Lower values show more of the background. Text stays solid.</p>
+          <p id="window-opacity-help" className="visually-hidden">Lower values show more of the background. Text stays solid.</p>
         </div>
         <div className="settings-row stacked reading-layouts">
           <span id="reading-label">Reading pane</span>
           <Segmented labelledBy="reading-label" value={value.reading} choices={readingLayouts}
             onChange={(reading) => onChange({ ...value, reading })} />
         </div>
+        <div className="settings-row stacked">
+          <span id="reader-toolbar-label">Full-width reader toolbar</span>
+          <Segmented labelledBy="reader-toolbar-label" value={value.readerToolbar} choices={readerToolbars}
+            onChange={(readerToolbar) => onChange({ ...value, readerToolbar })} />
+
+        </div>
         {onDensity && <div className="settings-row stacked">
           <span id="density-label">Density</span>
           <Segmented labelledBy="density-label" value={density} choices={[{ id: "comfortable", label: "Comfortable" }, { id: "compact", label: "Compact" }]} onChange={onDensity} />
-          <p className="note">Density changes spacing.</p>
+
         </div>}
       </div>
-      <p className="note">
-        {glass ? "Transparency applies to the whole window. " : ""}
-        {!glass ? "Transparency needs macOS or Windows 11. "
-          : value.transparency === "glass" ? "Glass blurs what is behind the window. It can lag while the window moves. "
-          : value.transparency === "subtle" ? "Subtle tints the window from your wallpaper and stays smooth. " : ""}
-        {value.reading === "split"
-          ? "Side by side shows opened mail beside the list; narrow windows open it in place of the list."
-          : "Full width opens mail in place of the list until you close it."}
-      </p>
+
       {dialog?.kind === "editor" && createPortal(<ThemeEditor initial={dialog.theme} editing={dialog.editing}
         scheme={scheme} onSave={saveTheme} onPreview={onPreview} onClose={close} />, document.body)}
       {dialog?.kind === "import" && createPortal(<ImportTheme onClose={close} onImport={(theme) => saveTheme({
@@ -204,7 +203,7 @@ export function AppearanceSettings({ value, scheme, onChange, onPreview = noPrev
       })} />, document.body)}
       {dialog?.kind === "delete" && createPortal(<Dialog title="Delete theme" onClose={close}>
         <p className="dialog-copy">Delete this custom theme from this device? The app will use the Black or White theme.</p>
-        {error && <p className="theme-error" role="alert">{error}</p>}
+        {error && <Notice text={error} />}
         <div className="theme-actions">
           <button type="button" className="button" onClick={close}>Cancel</button>
           <button type="button" className="button" onClick={() => {

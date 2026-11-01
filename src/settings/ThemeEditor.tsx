@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Dialog } from "../ui/Dialog";
 import { Segmented } from "../ui/Segmented";
@@ -49,7 +50,7 @@ export function ThemeEditor({ initial, scheme: initialScheme, editing, onSave, o
   const [theme, setTheme] = useState(initial);
   const [scheme, setScheme] = useState(initialScheme);
   const [advanced, setAdvanced] = useState(editing);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const palette = theme.palettes[scheme];
   useLayoutEffect(() => { onPreview({ scheme, palette }); }, [scheme, palette, onPreview]);
   useLayoutEffect(() => () => onPreview(null), [onPreview]);
@@ -80,7 +81,7 @@ export function ThemeEditor({ initial, scheme: initialScheme, editing, onSave, o
             choices={[{ id: "dark", label: "Dark" }, { id: "light", label: "Light" }]}
             onChange={setScheme} />
         </div>
-        <p className="note">Previewing across the app. Cancel restores your current theme.</p>
+
         <div className="settings-group theme-colors" key={scheme}>
           {paletteFields.filter((field) => advanced || field.id === "canvas" || field.id === "accent").map((field) => (
             <ColorField key={field.id} field={field} value={palette[field.id]}
@@ -92,10 +93,8 @@ export function ThemeEditor({ initial, scheme: initialScheme, editing, onSave, o
           <input type="checkbox" role="switch" checked={advanced}
             onChange={(event) => setAdvanced(event.target.checked)} />
         </label>
-        <p className="note">{advanced
-          ? "Adjust each color independently. Both palettes are saved together."
-          : "Background and accent generate matching colors for this palette. Use Advanced to fine-tune them."}</p>
-        {error && <p className="theme-error" role="alert">{error}</p>}
+
+        {error && <Notice text={error} />}
         <div className="theme-actions">
           <button type="button" className="button" onClick={onClose}>Cancel</button>
           <button type="submit" className="button">Save theme</button>
@@ -110,7 +109,7 @@ export function ImportTheme({ onImport, onClose }: {
   onClose: () => void;
 }) {
   const [text, setText] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const [reading, setReading] = useState(false);
   const active = useRef(true);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
@@ -126,7 +125,7 @@ export function ImportTheme({ onImport, onClose }: {
           setError(failure instanceof Error ? failure.message : "This theme could not be imported.");
         }
       }}>
-        <p className="dialog-copy">Choose an Emc² theme JSON file or paste its contents. Import creates a new theme.</p>
+        <p className="dialog-copy">Import a theme from a JSON file or pasted text.</p>
         <label className="theme-name">Theme file
           <input type="file" accept=".json,application/json" disabled={reading}
             onChange={async (event) => {
@@ -147,7 +146,7 @@ export function ImportTheme({ onImport, onClose }: {
           <textarea value={text} required maxLength={maxThemeFileBytes} rows={8} spellCheck={false} disabled={reading}
             onChange={(event) => { setText(event.target.value); setError(""); }} />
         </label>
-        {error && <p className="theme-error" role="alert">{error}</p>}
+        {error && <Notice text={error} />}
         <div className="theme-actions">
           <button type="button" className="button" onClick={onClose}>Cancel</button>
           <button type="submit" className="button" disabled={reading || !text.trim()}>{reading ? "Reading file…" : "Import theme"}</button>

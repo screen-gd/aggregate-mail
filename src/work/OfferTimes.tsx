@@ -1,3 +1,4 @@
+import { Notice } from "../ui/Toasts";
 import { useContext, useEffect, useRef, useState } from "react";
 import type { AvailabilitySettings } from "../../shared/availability";
 import type { CalendarEvent } from "../../shared/calendar";
@@ -157,6 +158,6 @@ function OfferTimesPanel({ mail, state, api, onOpenDraft }: OfferTimesProps) {
       {offer.booking && (booked ? <button type="button" disabled={pending} onClick={() => setEvent(booked)}>Review booked event</button> : <p role="status">The booked event was removed. No replacement will be created.</p>)}
       {!offer.booking && <p className="note">Booking rechecks busy data and saves one local event. Prepare an invitation or explicitly create on Google from its details to notify people.</p>}
     </div>)}
-    {error && <p role="alert">{error}</p>}
+    {error && <Notice text={error} />}
   </section>;
 }

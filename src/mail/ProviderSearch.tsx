@@ -1,3 +1,4 @@
+import { Notice } from "../ui/Toasts";
 import { useEffect, useRef, useState } from "react";
 import type { Account, ProviderSearchResult } from "../../shared/types";
 import { providerSearchLimit } from "../../shared/types";
@@ -46,8 +47,8 @@ export function ProviderSearch({ api, query, account, accountName, blocked, visi
     {" · "}<span role="status">Searching {accountName}…</span>
     {" "}<button type="button" onClick={() => { request.current?.abort(); setRun(undefined); }}>Cancel</button>
   </>;
-  if (state?.phase === "done") return <>{" · "}<span role="status">{providerSearchCoverage(state.result)}</span></>;
-  if (state?.phase === "failed") return <>{" · "}<span role="alert">{state.message}</span></>;
+  if (state?.phase === "done") return <Notice text={providerSearchCoverage(state.result)} kind="info" />;
+  if (state?.phase === "failed") return <Notice text={state.message} />;
   if (!account) return <span> · Choose an account to search older mail.</span>;
   return <>{" · "}<button type="button" disabled={blocked} title={`Search the account provider for up to ${providerSearchLimit} older matches`} onClick={start}>Search older mail in {accountName}</button></>;
 }

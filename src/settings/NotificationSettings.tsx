@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { Segmented } from "../ui/Segmented";
 import { useContext, useEffect, useId, useState } from "react";
 import { PrivacyContext } from "../ui/Privacy";
@@ -15,7 +16,7 @@ export function NotificationSettings({ value, onChange, onPreview }: {
   const bridge = window.desktop?.notifications;
   const [custom, setCustom] = useState(false);
   const [audioBusy, setAudioBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   useEffect(() => {
     let active = true;
     void bridge?.audio("status").then((result) => { if (active) setCustom(result.custom); }).catch(() => { if (active) setError("Notification audio is unavailable."); });
@@ -34,7 +35,7 @@ export function NotificationSettings({ value, onChange, onPreview }: {
     finally { setAudioBusy(false); }
   };
   return <section aria-label="Notification settings">
-    <p className="note">Choose how new mail gets your attention. Errors stay visible until dismissed.</p>
+
     <div className="settings-group">
       <label className="settings-row"><span>In-app new mail</span><input type="checkbox" role="switch" checked={value.newMail}
         onChange={(event) => onChange({ ...value, newMail: event.target.checked })} /></label>
@@ -53,9 +54,9 @@ export function NotificationSettings({ value, onChange, onPreview }: {
       {([ ["desktop", "Desktop new mail"], ["sender", "Show sender"], ["subject", "Show subject"], ["preview", "Show email preview"], ["openMail", "Click to open the email"] ] as const).map(([key, label]) =>
         <label className="settings-row" key={key}><span>{label}</span><input type="checkbox" role="switch" checked={value[key]}
           onChange={(event) => onChange({ ...value, [key]: event.target.checked })} /></label>)}
-      <div className="settings-row stacked"><span id={`${prefix}-sound`}>New-mail sound</span>
+      <div className="settings-row stacked"><span id={`${prefix}-sound`}>{window.desktop ? "New-mail sound" : "Notification sound"}</span>
         <Segmented labelledBy={`${prefix}-sound`} value={value.sound}
-          choices={[{ id: "system", label: "System default" }, { id: "off", label: "Off" }, { id: "custom", label: "Custom audio" }]}
+          choices={[{ id: "system", label: window.desktop ? "System default" : "Chime" }, { id: "off", label: "Off" }, { id: "custom", label: "Custom audio" }]}
           disabled={(sound) => audioBusy || sound === "custom" && !custom}
           onChange={(sound) => onChange({ ...value, sound })} /></div>
       <div className="settings-row"><span>{custom ? "Custom audio selected" : "Local audio file"}</span><div>
@@ -63,8 +64,8 @@ export function NotificationSettings({ value, onChange, onPreview }: {
         {custom && <button type="button" className="button" disabled={audioBusy} onClick={() => void audio("remove")}>Remove audio</button>}
       </div></div>
     </div>
-    <p className="note">Choose a WAV, MP3 or Ogg file up to 2 MB. Playback stops after 30 seconds. Custom audio requires the desktop app and replaces the system sound, including while the window is hidden.</p>
-    {error && <p role="alert" className="note">{error}</p>}
+    <details className="settings-help"><summary>Audio file requirements</summary><p className="note">Choose a WAV, MP3 or Ogg file up to 2 MB. Playback stops after 30 seconds. Custom audio requires the desktop app and replaces the system sound, including while the window is hidden.</p></details>
+    {error && <Notice text={error} />}
     {preview && <div className="notification-preview" role="status" aria-label="Notification preview settings">
       <strong>{value.newMail || value.desktop ? "New-mail preview" : "New-mail notifications are off"}</strong>
       {(value.newMail || value.desktop) && <p>{mailNotice({ id: "sample", sender: "Sample sender", subject: "Sample subject", preview: "A short sample email preview." }, value, privacy)}</p>}

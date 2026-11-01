@@ -1,3 +1,4 @@
+import { Notice } from "../ui/Toasts";
 import type { Api } from "../api";
 import { useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { imageSource, type Mail, type MailImage, type MailAttachment } from "../../shared/types";
@@ -159,14 +160,14 @@ function ImageConsent({ mail, loadImages, loadContent, body, api }: ImageProps) 
       <span>Remote images can tell the sender you opened this email.
         {privacy && " Image pixels may contain personal information."}</span>
     </div>}
-    {body && mail.bodyUnavailable && <p role="status">Message body could not be parsed within the import limit. Downloadable attachment metadata is shown separately.</p>}
+    {body && mail.bodyUnavailable && <Notice text="Message body could not be parsed within the import limit. Downloadable attachment metadata is shown separately." />}
     {body && contentStatus === "loading" && <p role="status">Loading formatted email…</p>}
-    {body && contentStatus === "error" && <p role="status">Formatted email is unavailable. The text is shown below. <button type="button" className="link" onClick={() => void recoverContent()}>Try again</button></p>}
+    {body && contentStatus === "error" && <><Notice text="Formatted email is unavailable. The text is shown instead." /><button type="button" className="link" onClick={() => void recoverContent()}>Retry formatted email</button></>}
     {body && content.attachments?.length !== 0 && ((content.attachments || []).length
       ? <Attachments api={api} mailId={mail.id} files={content.attachments!} />
       : <section className="reader-attachments" aria-label="Attachments"><h2>Attachments</h2><p>{contentStatus === "ready" ? "No cached attachment metadata." : "Attachment metadata is not yet available."}</p></section>)}
     <div id={region}>
-      {status === "error" && <p role="status">Images could not be loaded. The email may be unavailable or archived.</p>}
+      {status === "error" && <Notice text="Images could not be loaded. The email may be unavailable or archived." />}
       {body && <div className="message-body">
         {content.html ? <FormattedMail mailId={mail.id} attachments={content.attachments} html={content.html} showImages={shown} privacy={privacy} privateNames={names}
           renderText={(text, segments) => <Redact text={text} segments={segments} />} redactText={(text) => redactPrivateText(text, names)}

@@ -14,7 +14,7 @@ test("a refreshed pairing page resumes its cookie-bound approval without an invi
     await new Promise(resolve => setTimeout(resolve, 0));
     assert.deepEqual(routes, ["/auth/passkey/pair/status"]);
     assert.equal(dom.window.document.querySelector("button")!.disabled, false);
-    assert.match(dom.window.document.getElementById("pair-code")!.textContent!, /123456/);
+    assert.equal(dom.window.document.getElementById("pair-code")!.textContent, "");
   } finally {
     dom.window.dispatchEvent(new dom.window.Event("pagehide"));
     dom.window.close();

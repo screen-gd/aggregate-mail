@@ -51,6 +51,53 @@ test("invalid browser entrypoint stops before any storage access", () => {
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
+test("only the fixed brand images are public before browser authentication", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "emc2-brand-gate-"));
+  const previous = process.env.MAIL_STATIC_DIR;
+  const origin = "http://127.0.0.1:5173";
+  const names = ["lockup-mass.svg", "lockup-lumen.svg", "wordmark-mass.svg", "wordmark-lumen.svg", "icon-192.png", "apple-touch-icon.png"];
+  mkdirSync(path.join(directory, "brand"));
+  for (const name of [...names, "private.svg"]) writeFileSync(path.join(directory, "brand", name), `synthetic:${name}`);
+  process.env.MAIL_STATIC_DIR = directory;
+  const app = express();
+  app.use(browserAccess(password, origin));
+  app.use((_req, res) => res.send("protected-content"));
+  const server = app.listen(0, "127.0.0.1");
+  try {
+    await once(server, "listening");
+    const address = server.address();
+    assert.ok(address && typeof address !== "string");
+    const call = (target: string, headers: Record<string, string> = {}) => new Promise<{ status: number; headers: import("node:http").IncomingHttpHeaders; body: string }>((resolve, reject) => {
+      const req = request({ hostname: "127.0.0.1", port: address.port, path: target, headers: { Host: new URL(origin).host, ...headers } }, res => {
+        let body = "";
+        res.setEncoding("utf8").on("data", part => { body += part; }).on("end", () => resolve({ status: res.statusCode!, headers: res.headers, body }));
+      });
+      req.on("error", reject); req.end();
+    });
+    for (const name of names) {
+      const result = await call(`/brand/${name}`);
+      assert.equal(result.status, 200);
+      assert.equal(result.body, `synthetic:${name}`);
+      assert.match(String(result.headers["content-type"]), name.endsWith(".svg") ? /image\/svg\+xml/ : /image\/png/);
+      assert.equal(result.headers["set-cookie"], undefined);
+      assert.equal(result.headers["cache-control"], "no-store");
+    }
+    for (const target of ["/brand/private.svg", "/brand/../private.svg", "/brand/%2e%2e/private.svg", "/assets/main.js"]) {
+      const result = await call(target);
+      assert.doesNotMatch(result.body, /synthetic:private|protected-content/);
+    }
+    assert.equal((await call("/api/state")).status, 401);
+    assert.equal((await call("/brand/icon-192.png", { Origin: "https://foreign.example.test" })).status, 403);
+    const page = await call("/auth");
+    assert.match(page.body, /\/brand\/lockup-mass\.svg/);
+    assert.match(String(page.headers["content-security-policy"]), /img-src 'self';/);
+  } finally {
+    server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()));
+    if (previous === undefined) delete process.env.MAIL_STATIC_DIR; else process.env.MAIL_STATIC_DIR = previous;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("browser gate protects reads, writes and assets, with origin checks, rotation, lock and expiry", async () => {
   let time = 1000;
   const app = express();

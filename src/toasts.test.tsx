@@ -150,3 +150,135 @@ test("configured durations, no expiry, permanent errors and filtering survive pr
     for (const [key, descriptor] of previous) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); }
   }
 });
+
+test("page feedback uses one private notification stack and follows the active dialog", async () => {
+  const { Notice, NotificationProvider } = await import("./ui/Toasts");
+  const { Dialog } = await import("./ui/Dialog");
+  const dom = new JSDOM('<div id="root"></div>');
+  const globals = { window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true };
+  const previous = new Map(Object.keys(globals).map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const [key, value] of Object.entries(globals)) Object.defineProperty(globalThis, key, { configurable: true, value });
+  const { createRoot } = await import("react-dom/client");
+  const root = createRoot(document.getElementById("root")!);
+  let notices!: ReturnType<typeof useToasts>;
+  function Harness({ error, dialog = false }: { error: string; dialog?: boolean }) {
+    notices = useToasts();
+    const form = <main><input aria-label="Name" aria-describedby="name-error" /><Notice text={error} id="name-error" /><button>Retry</button></main>;
+    return <PrivacyContext.Provider value={{ on: true, revealed: new Set(), toggle() {} }}><NotificationProvider push={notices.push}>
+      <ToastStack toasts={notices.toasts} onDismiss={notices.dismiss} />
+      {dialog ? <Dialog title="Edit" onClose={() => {}}>{form}</Dialog> : form}
+    </NotificationProvider></PrivacyContext.Provider>;
+  }
+  try {
+    await act(async () => root.render(<Harness error="Could not save reader@example.com" />));
+    assert.equal(document.querySelector('main [role="alert"]'), null);
+    assert.equal(document.querySelectorAll('.toast [role="alert"]').length, 1);
+    assert.equal(document.querySelector('#name-error')?.className, "visually-hidden");
+    assert.doesNotMatch(document.body.innerHTML, /reader@example\.com/);
+    await act(async () => root.render(<Harness error="Could not save reader@example.com" dialog />));
+    assert.equal(notices.toasts.length, 1, "opening a dialog does not duplicate feedback");
+    assert.equal(document.querySelectorAll('[role="dialog"] .toast-stack').length, 1, "notices remain inside modal accessibility and keyboard scope");
+    const dismiss = document.querySelector<HTMLButtonElement>('[aria-label="Dismiss notification"]')!;
+    const first = document.querySelector<HTMLInputElement>('input')!;
+    await act(async () => { dismiss.focus(); window.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Tab", bubbles: true })); });
+    assert.equal(document.activeElement?.getAttribute("aria-label"), "Close dialog", "Tab from last notification wraps inside the dialog");
+    assert.ok(first.isConnected);
+    await act(async () => root.render(<Harness error="" />));
+    assert.equal(document.querySelectorAll('.toast-stack').length, 1);
+    assert.equal(document.querySelector('[role="dialog"]'), null);
+    assert.equal(notices.toasts.length, 1, "an error survives leaving its form");
+  } finally {
+    await act(async () => root.unmount()); dom.window.close();
+    for (const [key, descriptor] of previous) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); }
+  }
+});
+
+test("browser chime waits for interaction, coalesces bursts and releases audio", async () => {
+  const { notificationSound } = await import("./ui/notification-sound");
+  const dom = new JSDOM("");
+  let starts = 0, disconnected = 0, closed = 0;
+  let context!: FakeAudio;
+  class FakeAudio {
+    state = "running";
+    currentTime = 1;
+    destination = {};
+    constructor() { context = this; }
+    async resume() {}
+    async close() { closed++; }
+    createOscillator() { return { frequency: { value: 0 }, connect() {}, disconnect() { disconnected++; }, onended: () => {}, start() { starts++; }, stop() { this.onended(); } }; }
+    createGain() { return { gain: { setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, disconnect() { disconnected++; } }; }
+  }
+  Object.defineProperty(dom.window, "AudioContext", { value: FakeAudio });
+  const sound = notificationSound(dom.window as unknown as Window & typeof globalThis);
+  sound.play(); assert.equal(starts, 0, "no audio before interaction");
+  dom.window.dispatchEvent(new dom.window.Event("pointerdown"));
+  sound.play(); sound.play(); assert.equal(starts, 1, "a notification burst plays once");
+  context.currentTime = 2; sound.play(); assert.equal(starts, 2);
+  assert.equal(disconnected, 4, "completed tones release their nodes");
+  sound.close(); assert.equal(closed, 1);
+  dom.window.close();
+});
+
+test("dialog changes preserve pending notices and identical invalid attempts notify again", async (context) => {
+  const { NotificationProvider, Notice, useFeedbackState } = await import("./ui/Toasts");
+  const { Dialog } = await import("./ui/Dialog");
+  const { useEffect } = await import("react");
+  const { createPortal } = await import("react-dom");
+  const dom = new JSDOM('<div id="root"></div>');
+  const globals = { window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true };
+  const previous = new Map(Object.keys(globals).map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const [key, value] of Object.entries(globals)) Object.defineProperty(globalThis, key, { configurable: true, value });
+  const { createRoot } = await import("react-dom/client");
+  const root = createRoot(document.getElementById("root")!);
+  context.mock.timers.enable({ apis: ["Date", "setTimeout"] });
+  let notices!: ReturnType<typeof useToasts>, report!: (value: string) => void;
+  let mounts = 0, cleanups = 0;
+  function OutboxProbe() {
+    useEffect(() => { mounts++; return () => { cleanups++; }; }, []);
+    return <button>Pending action</button>;
+  }
+  function Form() {
+    const [error, setError] = useFeedbackState(); report = setError;
+    return <Notice text={error} />;
+  }
+  function Harness({ dialogs = 0 }: { dialogs?: number }) {
+    notices = useToasts();
+    return <NotificationProvider push={notices.push}>
+      <ToastStack toasts={notices.toasts} onDismiss={notices.dismiss} outbox={<OutboxProbe />} />
+      <Form />
+      {dialogs > 0 && <Dialog title="Outer" onClose={() => {}}><input aria-label="Outer field" />
+        {dialogs > 1 && createPortal(<Dialog title="Inner" onClose={() => {}}><input aria-label="Inner field" /></Dialog>, document.body)}
+      </Dialog>}
+    </NotificationProvider>;
+  }
+  try {
+    await act(async () => root.render(<Harness />));
+    await act(async () => notices.push("Saved", "success"));
+    const toast = document.querySelector('.toast')!;
+    await act(async () => context.mock.timers.tick(5500));
+    for (const dialogs of [1, 2, 1, 0]) {
+      await act(async () => root.render(<Harness dialogs={dialogs} />));
+      assert.ok(document.querySelector('.toast') === toast, "the same notification node moves without remounting");
+      assert.equal(mounts, 1); assert.equal(cleanups, 0);
+      if (dialogs) {
+        const stack = document.querySelector('.toast-stack')!;
+        assert.ok(stack.closest('.dialog') === null, "stack stays outside the filtered scrolling panel");
+        assert.equal(stack.closest('[role="dialog"]')?.getAttribute('aria-label'), dialogs === 2 ? "Inner" : "Outer");
+      }
+    }
+    await act(async () => context.mock.timers.tick(500));
+    await act(async () => context.mock.timers.tick(200));
+    assert.equal(notices.toasts.length, 0, "opening dialogs does not restart expiry");
+    await act(async () => report("Choose a valid time."));
+    assert.equal(notices.toasts.length, 1);
+    await act(async () => notices.dismiss(notices.toasts[0].id));
+    assert.equal(notices.toasts.length, 0);
+    await act(async () => report("Choose a valid time."));
+    assert.equal(notices.toasts.length, 1, "identical invalid input reports a new attempt");
+    await act(async () => report(""));
+    assert.equal(notices.toasts.length, 1, "corrected input does not create an extra notification");
+  } finally {
+    await act(async () => root.unmount()); dom.window.close();
+    for (const [key, descriptor] of previous) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); }
+  }
+});

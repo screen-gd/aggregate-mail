@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { CalendarEvent, WorkSessionList } from "../../shared/calendar";
 import { sessionLabel } from "../../shared/calendar";
@@ -20,7 +21,7 @@ export function useWorkSessions(api: Api, parentId: string | undefined, accountK
   const key = `${accountKey}:${parentId || ""}`, current = useRef(key); current.current = key;
   const live = useRef(true), reads = useRef(0), lock = useRef(false);
   const [snapshot, setSnapshot] = useState<{ key: string; value: WorkSessionList }>();
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const [editor, setEditor] = useState<Editor>();
   const [operation, setOperation] = useState<Operation>();
   const [recovered, setRecovered] = useState<CalendarEvent | null>();
@@ -132,9 +133,9 @@ export function WorkSessions({ parent, sessions, disabled }: { parent: Commitmen
   return <section className="work-sessions" aria-label="Work sessions">
     <h3 ref={heading} tabIndex={-1}>Local work sessions</h3>
     <p className="work-meta">Local calendar conflicts only. Google calendars are excluded. Free sessions do not block offered times.</p>
-    {sessions.error && <p role="alert">{sessions.error}</p>}
+    {sessions.error && <Notice text={sessions.error} />}
     {!sessions.value && !sessions.error && <p role="status">Loading work sessions…</p>}
-    {sessions.value && !sessions.value.available && <p role="alert">{sessions.value.reason}</p>}
+    {sessions.value && !sessions.value.available && <Notice text={sessions.value.reason} />}
     {sessions.message && !sessions.operation && !sessions.editor && <p role="status">{sessions.message}</p>}
     {!!sessions.value?.sessions.length && <ul>{sessions.value.sessions.map(event => <li key={event.id} data-session-id={event.id}>
       <p>{eventWhen(event)}</p><p className="work-meta">{sessionLabel(event)}</p><SessionActions event={event} parent={parent} sessions={sessions} disabled={disabled} />

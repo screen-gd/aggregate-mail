@@ -135,7 +135,7 @@ export function browserAccess(password: string, origin: string, now = Date.now) 
     const title = unlocked ? "Emc² is unlocked" : "Unlock Emc²";
     return res.type("html").send(browserAuthPage(title, `<h1>${title}</h1>
 <p>${unlocked ? "Your inbox is ready on this browser." : local ? "Enter your host recovery passphrase to open your inbox and connect a phone." : "Use your passkey to open your inbox with your screen lock."}</p>
-${unlocked || local ? "" : '<button type="button" id="passkey-unlock">Unlock with passkey</button><p id="passkey-status" role="status" aria-live="polite"></p><button type="button" id="passkey-connect">Connect this device</button><details id="first-time"><summary>Connect a new device</summary><ol class="steps"><li>Connect this device to your Tailscale network.</li><li>On your host, open Settings → Phone access → Connect phone.</li><li>Scan the QR with your camera, or open the setup link on this device.</li><li>Compare the code, approve on the host, then save your passkey.</li></ol><p>Already connected? Use the same browser or password manager where you saved your passkey.</p></details>'}
+${unlocked || local ? "" : '<button type="button" id="passkey-unlock">Unlock with passkey</button><p id="passkey-status" role="status" aria-live="polite"></p><button type="button" id="passkey-connect">Connect this device</button><details id="first-time"><summary>Connect a new device</summary><ol class="steps"><li>Connect this device to your Tailscale network.</li><li>On your host, open Settings → Phone access → Connect phone.</li><li>Scan the QR with your camera, or open the setup link on this device.</li><li>Compare the code, approve on the host, then save your passkey.</li></ol><p>Headless host? Run <code>npm run phone:link</code> in the host installation with its launch environment. Open the one-time link on your phone and save a passkey. No second host approval is needed.</p><p>Already connected? Use the same browser or password manager where you saved your passkey.</p></details>'}
 ${error ? `<p role="alert">${error}</p>` : ""}
 ${unlocked || local ? `<form method="post" action="/auth/${unlocked ? "lock" : "login"}">
 ${unlocked ? '<p><a class="primary" href="/">Open inbox</a></p>' : '<label for="password">Recovery passphrase</label><input id="password" name="password" type="password" minlength="16" maxlength="256" autocomplete="current-password" required autofocus>'}
@@ -147,7 +147,7 @@ ${unlocked ? '<p><a class="primary" href="/">Open inbox</a></p>' : '<label for="
       "Cache-Control": "no-store",
       "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+      "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
     });
     const requestOrigin = originFor(req);
     res.set("X-Emc2-Browser", "1");
@@ -158,6 +158,9 @@ ${unlocked ? '<p><a class="primary" href="/">Open inbox</a></p>' : '<label for="
     next();
   });
   router.get("/auth/style.css", (_req, res) => res.type("css").send(browserAuthStyles));
+  // These fixed application-brand assets are public; other static files keep the gate.
+  router.get(["/brand/lockup-mass.svg", "/brand/lockup-lumen.svg", "/brand/wordmark-mass.svg", "/brand/wordmark-lumen.svg", "/brand/icon-192.png", "/brand/apple-touch-icon.png"], (req, res) =>
+    res.sendFile(path.basename(req.path), { root: path.resolve(process.env.MAIL_STATIC_DIR || "dist", "brand") }));
   router.use(authRouter);
   router.get("/auth/session", (req, res) => {
     const admitted = authenticated(req, false);

@@ -97,6 +97,7 @@ async function mount(native = false, setup?: (state: State, storage: Storage) =>
   }
   const previousFetch = globalThis.fetch;
   const mutations: string[] = [];
+  const mailActions: { id: string; action: string }[] = [];
   const requests: string[] = [];
   let savedViews: SavedView[] = [];
   const renames: unknown[] = [];
@@ -176,9 +177,14 @@ async function mount(native = false, setup?: (state: State, storage: Storage) =>
       mutations.push(url);
       const mail = state.messages.find((mail) => url.endsWith(encodeURIComponent(mail.id)));
       await readWait;
-      if (mail) mail.unread = false;
+      if (mail) {
+        const { action } = JSON.parse(String(options.body));
+        mailActions.push({ id: mail.id, action });
+        if (action === "read" || action === "unread") mail.unread = action === "unread";
+        if (action === "archive") mail.archived = true;
+      }
     }
-    return { ok: true, json: async () => url === "/api/state" ? { ...state, csrf: "synthetic" } :
+    return { ok: true, json: async () => url === "/api/state" ? structuredClone({ ...state, csrf: "synthetic" }) :
       url === "/api/contacts" ? { saved: [], recent: [] } :
       url === "/api/workspace" ? { commitments: [], projects: [], decisions: [], proposals: [], coverage: [] } :
       url === "/api/agent/grants" ? [] : url === "/api/mcp" ? {enabled:false,allowSending:false,token:null} :
@@ -264,7 +270,7 @@ async function mount(native = false, setup?: (state: State, storage: Storage) =>
     });
     if (field.closest(".search")) await act(async () => { await new Promise(resolve => setTimeout(resolve, 135)); });
   };
-  return { state, storage: dom.window.localStorage, window: dom.window, container, button, click, choose, openFilters, account, activeAccount, accountButtons, back, forward, open, mouse, key, input, mutations, requests,
+  return { state, storage: dom.window.localStorage, window: dom.window, container, button, click, choose, openFilters, account, activeAccount, accountButtons, back, forward, open, mouse, key, input, mutations, requests, mailActions,
     renames, failRename: (value: boolean) => { renameFails = value; },
     failComposePreferences: (value: boolean) => { composePreferencesFail = value; },
     composeSaveRequests: () => composeSaveRequests,
@@ -1024,6 +1030,13 @@ test("sidebar destinations have distinct decorative navigation glyphs", async ()
     const glyphs = labels.map((label) => {
       const button = app.button(label);
       assert.ok(button.closest("#sidebar"), `${label} belongs in the sidebar`);
+      if (label === "Drafts") {
+        const icon = button.querySelector<HTMLElement>(".drafts-mark");
+        assert.ok(icon, "Drafts has an icon");
+        assert.ok(icon.style.maskImage.includes("drafts.png"), "Drafts uses the rebuild's envelope icon");
+        assert.equal(icon.getAttribute("aria-hidden"), "true");
+        return icon.style.maskImage;
+      }
       const svg = button.querySelector("svg");
       assert.ok(svg, `${label} has an icon`);
       assert.equal(svg.getAttribute("width"), "16");
@@ -1035,6 +1048,43 @@ test("sidebar destinations have distinct decorative navigation glyphs", async ()
       return svg.innerHTML;
     });
     assert.equal(new Set(glyphs).size, labels.length, "each sidebar destination has a distinct rendered glyph");
+  } finally { await app.close(); }
+});
+
+test("the rebuild account footer follows the filter, preserves privacy and opens existing settings", async () => {
+  const app = await mount();
+  try {
+    const footer = () => app.container.querySelector<HTMLElement>(".sidebar-account-card")!;
+    assert.match(footer().textContent!, /All accounts.*2 connected accounts/);
+    await app.click(footer());
+    assert.equal(app.button("Accounts").getAttribute("aria-current"), "page");
+    await app.click(app.button("Appearance"));
+    await app.click(app.button("Close settings"));
+    await app.click(footer());
+    assert.equal(app.button("Accounts").getAttribute("aria-current"), "page", "All accounts ignores the last Settings section");
+    await app.click(app.button("Close settings"));
+    await app.click(app.button("first@example.com"));
+    assert.match(footer().textContent!, /first@example.com/);
+    await app.click(app.button("Hide personal information"));
+    assert.doesNotMatch(footer().outerHTML, /first@example.com|second@example.com/);
+    assert.match(footer().textContent!, /Account 1/);
+    assert.ok(footer().getAttribute("aria-label")?.includes("Account 1"), "the accessible name includes the visible privacy-safe account label");
+    await app.click(footer());
+    assert.equal(app.button("Accounts").getAttribute("aria-current"), "page");
+    assert.ok(app.container.querySelector(".settings"));
+    assert.equal(app.mutations.length, 0, "account summary only navigates");
+  } finally { await app.close(); }
+});
+
+test("the rebuild footer opens Accounts with no connected accounts", async () => {
+  const app = await mount(false, state => { state.accounts = []; state.messages = []; });
+  try {
+    const footer = app.container.querySelector<HTMLButtonElement>(".sidebar-account-card")!;
+    assert.match(footer.textContent!, /Connect an account/);
+    assert.match(footer.getAttribute("aria-label") || "", /Connect an account/);
+    await app.click(footer);
+    assert.equal(app.button("Accounts").getAttribute("aria-current"), "page");
+    assert.equal(app.mutations.length, 0);
   } finally { await app.close(); }
 });
 
@@ -1126,6 +1176,45 @@ test("side by side uses one column on narrow screens", async () => {
   } finally { await app.close(); }
 });
 
+test("tablet reading uses the available width without an empty reader column", async () => {
+  const app = await mount(false, undefined, {}, [], 1024);
+  try {
+    assert.equal(!!app.container.querySelector(".reader-pane"), false, "tablet must not reserve an empty reader");
+    await app.open("a:1");
+    assert.equal(app.title(), "Alpha");
+    assert.equal(!!app.container.querySelector(".reader-pane"), false);
+    assert.equal(!!app.container.querySelector("[id='mail-a:2']"), false);
+    await app.click(app.button("Close email"));
+    assert.ok(app.container.querySelector("[id='mail-a:2']"));
+  } finally { await app.close(); }
+});
+
+test("phone category picker exposes every category and uses the existing mail filter", async () => {
+  const app = await mount(false, undefined, {}, [], 360);
+  try {
+    const picker = app.container.querySelector<HTMLSelectElement>('select[aria-label="Inbox category"]');
+    assert.ok(picker);
+    assert.deepEqual(Array.from(picker.options, option => option.value), ["primary", "social", "promotions", "newsletters", "transactions", "updates"]);
+    assert.equal(picker.value, "primary");
+    assert.match(picker.options[0].textContent || "", /3 unread/);
+    await act(async () => {
+      picker.value = "promotions";
+      picker.dispatchEvent(new app.window.Event("change", { bubbles: true }));
+    });
+    assert.ok(app.container.querySelector("[id='mail-a:3']"));
+    assert.equal(!!app.container.querySelector("[id='mail-a:1']"), false);
+    assert.equal(!!app.container.querySelector(".inbox-tabs"), false);
+  } finally { await app.close(); }
+});
+
+test("compact phone mail uses measured cards instead of a squeezed desktop row", async () => {
+  const app = await mount(false, (_state, storage) => storage.setItem("emc2.density", "compact"), {}, [], 360);
+  try {
+    assert.equal(app.container.querySelector("[id='mail-a:1']")?.classList.contains("card"), true);
+    assert.equal(!!app.container.querySelector(".mail-list-columns"), false);
+  } finally { await app.close(); }
+});
+
 test("compose preferences survive Settings navigation, close and failed save", async () => {
   const app = await mount();
   try {
@@ -1143,7 +1232,8 @@ test("compose preferences survive Settings navigation, close and failed save", a
     app.failComposePreferences(true);
     await act(async () => app.container.querySelector(".compose-settings")!.dispatchEvent(new app.window.Event("submit", { bubbles: true, cancelable: true })));
     assert.equal(signature().value, "A retained signature");
-    assert.match(app.container.querySelector(".compose-settings [role=alert]")?.textContent || "", /edits are kept/);
+    assert.equal(app.container.querySelector(".compose-settings [role=alert]"), null);
+    assert.match(app.container.querySelector(".toast-stack")?.textContent || "", /edits are kept/);
     app.failComposePreferences(false);
     await act(async () => app.container.querySelector(".compose-settings")!.dispatchEvent(new app.window.Event("submit", { bubbles: true, cancelable: true })));
     assert.equal(app.state.composePreferences?.signatures.a, "A retained signature");
@@ -1493,7 +1583,7 @@ test("Settings rename persists through PATCH and reload, clears to email, cancel
     await app.click(app.button("Rename")); await app.input(form().querySelector("input")!, "Keep this name");
     app.failRename(true); await submit();
     assert.equal(form().querySelector<HTMLInputElement>("input")!.value, "Keep this name");
-    assert.match(form().querySelector('[role="alert"]')!.textContent!, /Could not rename/);
+    assert.match(app.container.querySelector(".toast-stack")!.textContent!, /Could not rename/);
     assert.equal(app.state.accounts[0].name, "Personal inbox");
     app.failRename(false); await app.input(form().querySelector("input")!, "x".repeat(81)); await submit();
     assert.deepEqual(app.renames.at(-1), { url: "/api/accounts/a", body: { name: "x".repeat(80) } });
@@ -1895,9 +1985,13 @@ test("compose keeps toolbar search and privacy usable without losing the draft o
     const privacy = app.button("Hide personal information");
     await act(async () => privacy.focus());
     await app.key("Tab");
-    assert.equal(app.window.document.activeElement, app.container.querySelector('.compose-dialog .dialog-title button'));
+    assert.equal(app.window.document.activeElement?.getAttribute("aria-label"), "Back");
+    await app.key("Tab");
+    assert.equal(app.window.document.activeElement?.getAttribute("aria-label"), "Close dialog");
     await app.key("Tab", { shiftKey: true });
-    assert.equal(app.window.document.activeElement, privacy);
+    assert.equal(app.window.document.activeElement?.getAttribute("aria-label"), "Back");
+    await app.key("Tab", { shiftKey: true });
+    assert.equal(app.window.document.activeElement?.getAttribute("aria-label"), "Hide personal information");
     await app.click(app.button("Hide personal information"));
     assert.equal(app.storage.getItem("privacy"), "on");
     await act(async () => search.focus());
@@ -2023,14 +2117,14 @@ test("compose keyboard cycle reaches sidebar and toolbar without stealing editin
     await app.click(app.button("Hide sidebar"));
     await act(async () => app.button("Show sidebar").focus());
     await app.key("Tab");
-    assert.equal(doc.activeElement?.getAttribute("aria-label"), "Back", "collapsed sidebar toggle stays in the compose cycle");
+    assert.equal(doc.activeElement?.getAttribute("aria-label"), "Search cached mail and saved drafts", "collapsed sidebar toggle reaches the leading search field");
     await app.click(app.button("Show sidebar"));
     await act(async () => app.button("New message").focus());
     await app.key("Tab");
     assert.equal(doc.activeElement, app.button("Drafts"));
     await act(async () => app.button("Back").focus());
     await app.key("Tab");
-    assert.ok(doc.activeElement?.closest(".app-toolbar"));
+    assert.equal(doc.activeElement?.getAttribute("aria-label"), "Close dialog", "history ends the toolbar before the composer");
     await act(async () => app.button("Close dialog").focus());
     await act(async () => app.button("Close dialog").dispatchEvent(new app.window.KeyboardEvent("keydown", { key: "p", bubbles: true, cancelable: true })));
     assert.equal(app.storage.getItem("privacy"), "on");
@@ -2220,7 +2314,7 @@ test("Find pinned mail searches this view or All cached and keeps the selected a
   try {
     await app.click(app.account("first@example.com"));
     await app.openFilters();
-    assert.match(app.container.querySelector(".pinned-help")?.textContent || "", /Pin keeps mail for reference/);
+    assert.equal(app.container.querySelector(".pinned-help"), null, "filters keep controls without permanent coaching");
     await app.click(app.button("Find pinned mail in this view"));
     assert.equal(app.container.querySelector('[aria-label="Mail filters and sort"]'), null, "the popover closes");
     assert.equal(app.container.querySelector<HTMLInputElement>(".search input")!.value, "is:pinned");
@@ -2564,6 +2658,41 @@ test("pending sequences preserve Escape, Tab and system shortcuts", async () => 
   } finally { await app.close(); }
 });
 
+test("phone swipes traverse history and respect scroll, Settings and the saved preference", async () => {
+  const app = await mount(false, undefined, {}, [], 390);
+  const swipe = async (right: boolean, vertical = false) => {
+    const target = app.container.querySelector(".app-main")!;
+    await act(async () => {
+      for (const type of ["touchstart", "touchmove", "touchend"]) {
+        const point = { identifier: 1, clientX: type === "touchstart" ? 150 : right ? 250 : 50,
+          clientY: type !== "touchstart" && vertical ? 250 : 100 };
+        const event = new app.window.Event(type, { bubbles: true, cancelable: true });
+        Object.defineProperties(event, { touches: { value: type === "touchend" ? [] : [point] }, changedTouches: { value: [point] } });
+        target.dispatchEvent(event);
+      }
+    });
+  };
+  const view = () => app.container.querySelector(".app")?.getAttribute("data-view");
+  try {
+    await app.click(app.button("Show sidebar"));
+    await app.click(app.button("Today"));
+    assert.equal(view(), "actions");
+    await swipe(true, true); assert.equal(view(), "actions");
+    await swipe(true); assert.equal(view(), "inbox");
+    await swipe(false); assert.equal(view(), "actions");
+    await app.click(app.button("Show sidebar"));
+    await app.click(app.button("Settings"));
+    await swipe(true); assert.equal(view(), "settings");
+    await app.click(app.button("Keyboard and mouse"));
+    const toggle = [...app.container.querySelectorAll("label")].find(label => label.textContent === "Phone swipes navigate Back / Forward")!.querySelector<HTMLInputElement>("input")!;
+    await app.click(toggle);
+    assert.equal(JSON.parse(app.storage.getItem("emc2.interaction.v1")!).touchNavigation, false);
+    await app.click(app.button("Close settings"));
+    await swipe(true); assert.equal(view(), "actions");
+    assert.equal(app.mutations.length, 0, "view swipes do not change mail");
+  } finally { await app.close(); }
+});
+
 test("phone navigation can leave Today, close the drawer and reopen it for Settings", async () => {
   const app = await mount(false, undefined, {}, [], 390);
   try {
@@ -2771,6 +2900,11 @@ test("search widening preserves query and account and Back restores exact filter
     assert.ok(app.requests.some(url => url === "/api/messages/search?query=Alpha"), "cached fixture search completed");
     assert.match(help().textContent!, /Unread.*High relevance.*Oldest first/);
     assert.equal(help().getAttribute("role"), "status");
+    assert.ok(help().classList.contains("visually-hidden"), "search coverage stays accessible without a permanent banner");
+    assert.equal(app.container.querySelector(".search-help"), null, "search help opens only on request");
+    await app.click(app.button("Search options"));
+    assert.ok(app.container.querySelector(".search-help"), "provider search and syntax remain reachable");
+    await app.click(app.button("Search options"));
     await app.click(app.button("Search all cached mail in this account"));
     assert.equal(app.container.querySelector<HTMLInputElement>(".search input")!.value, "Alpha");
     assert.equal(app.activeAccount(), "first@example.com");
@@ -3006,4 +3140,169 @@ test("selecting mail from an Inbox tab moves focus to the rail checkbox", async 
     const master = app.container.querySelector<HTMLButtonElement>('[aria-label="Select all visible (up to 200)"]')!;
     assert.equal(app.window.document.activeElement, master, "focus leaves the hidden tabs for the master checkbox");
   } finally { await app.close(); }
+});
+
+for (const width of [360, 1440]) for (const readerToolbar of ["compact", "actions", "separate"] as const) {
+  test(`${readerToolbar} reader toolbar keeps one action set and restores categories at ${width}px`, async () => {
+    const app = await mount(false, (_state, storage) => storage.setItem("emc2.appearance.v1", JSON.stringify({ reading: "full", readerToolbar })), {}, [], width);
+    try {
+      await app.open("a:1");
+      const toolbar = app.container.querySelector('.mail-view .mail-actions')!;
+      assert.ok(toolbar);
+      assert.equal(app.container.querySelectorAll('.mail-view .mail-actions').length, 1);
+      assert.equal(!!toolbar.closest('.mail-category-bar'), readerToolbar !== "separate");
+      assert.equal(!!app.container.querySelector('.mail-category-bar :is(.inbox-tabs, .inbox-category-picker)'), readerToolbar !== "actions");
+      assert.equal(app.container.querySelector('.mail-view .rail-select'), null, "no empty selection gutter while reading");
+      for (const label of ["Move to Trash", "Reply", "Pin email", "Previous email", "Next email", "Close email"])
+        assert.ok(toolbar.querySelector(`[aria-label="${label}"]`), label);
+      await app.click(app.button("Next email"));
+      assert.equal(app.title(), "Beta");
+      await app.click(app.button("Close email"));
+      assert.ok(app.container.querySelector('.mail-category-bar :is(.inbox-tabs, .inbox-category-picker)'));
+      assert.ok(app.container.querySelector('.rail-select [role="checkbox"]'));
+      assert.equal(app.container.querySelector('.mail-view .mail-actions'), null);
+    } finally { await app.close(); }
+  });
+}
+
+test("Appearance changes the full-width toolbar immediately and preserves the choice after reopening", async () => {
+  const app = await mount(false, (_state, storage) => storage.setItem("emc2.appearance.v1", JSON.stringify({ reading: "full" })));
+  let saved = "";
+  try {
+    await app.open("a:1");
+    for (const [label, value] of [["Actions only", "actions"], ["Two rows", "separate"], ["One compact row", "compact"]]) {
+      await app.click(app.button("Settings"));
+      await app.click(app.button("Appearance"));
+      const group = app.container.querySelector('[aria-labelledby="reader-toolbar-label"]')!;
+      const choice = [...group.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === label)!;
+      await app.click(choice);
+      assert.equal(choice.getAttribute("aria-checked"), "true");
+      saved = app.storage.getItem("emc2.appearance.v1")!;
+      assert.equal(JSON.parse(saved).readerToolbar, value);
+      await app.click(app.button("Close settings"));
+      assert.equal(app.container.querySelector('.mail-view')?.getAttribute('data-reader-toolbar'), value);
+      assert.equal(app.title(), "Alpha", "changing layout preserves the opened message");
+    }
+  } finally { await app.close(); }
+  const reopened = await mount(false, (_state, storage) => storage.setItem("emc2.appearance.v1", saved));
+  try {
+    await reopened.open("a:1");
+    assert.ok(reopened.container.querySelector('.mail-view[data-reader-toolbar="compact"] .mail-category-bar .mail-actions'));
+  } finally { await reopened.close(); }
+});
+
+
+test("phone mail gestures target their row, preserve taps and pause during bulk selection", async () => {
+  const app = await mount(false, (_state, storage) => storage.setItem("emc2.interaction.v1", JSON.stringify({ ...defaults, opening: "single" })), {}, [], 390);
+  const row = (id: string) => app.container.querySelector<HTMLElement>(`[id='mail-${id}']`)!;
+  const touch = (target: Element, type: string, x = 150, y = 100) => {
+    const point = { identifier: 1, clientX: x, clientY: y };
+    const event = new app.window.Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperties(event, { touches: { value: type === "touchend" || type === "touchcancel" ? [] : [point] }, changedTouches: { value: [point] } });
+    target.dispatchEvent(event);
+  };
+  const swipe = async (id: string, right: boolean) => {
+    const target = row(id);
+    await act(async () => {
+      touch(target, "touchstart"); touch(target, "touchmove", right ? 250 : 50); touch(target, "touchend", right ? 250 : 50);
+    });
+    await act(async () => target.dispatchEvent(new app.window.MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 })));
+  };
+  const hold = async (id: string) => {
+    const target = row(id);
+    await act(async () => { touch(target, "touchstart"); await new Promise(resolve => setTimeout(resolve, 480)); });
+    await act(async () => {
+      touch(target, "touchend");
+      target.dispatchEvent(new app.window.MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+    });
+  };
+  try {
+    await swipe("a:2", true);
+    assert.deepEqual(app.mailActions, [{ id: "a:2", action: "read" }]);
+    assert.equal(app.title(), undefined, "the synthetic click after a swipe must not open mail");
+    assert.equal(app.container.querySelector(".app")?.getAttribute("data-view"), "inbox");
+    await swipe("a:2", true);
+    assert.deepEqual(app.mailActions.at(-1), { id: "a:2", action: "unread" });
+    assert.ok(row("a:2").classList.contains("unread"));
+    await hold("a:1");
+    assert.equal(row("a:1").closest(".mail-row")?.querySelector('[role="checkbox"]')?.getAttribute("aria-checked"), "true");
+    assert.equal(app.title(), undefined, "holding never opens or marks read");
+    await swipe("a:1", false); await swipe("a:2", false); await swipe("b:1", true);
+    assert.equal(app.mailActions.length, 2, "selection blocks swipes on selected and unselected rows");
+    await hold("b:1");
+    assert.equal(app.container.querySelectorAll('.mail-select[aria-checked="true"]').length, 2);
+    await hold("a:1"); await hold("b:1");
+    await swipe("a:2", false);
+    assert.deepEqual(app.mailActions.at(-1), { id: "a:2", action: "archive" });
+    assert.equal(!!row("a:2"), false, "archived mail leaves Inbox");
+    assert.ok(row("a:1")); assert.ok(row("b:1"));
+    // A fresh tap still opens through the configured single-click action.
+    await act(async () => { touch(row("b:1"), "touchstart"); touch(row("b:1"), "touchend"); });
+    await app.click(row("b:1"));
+    assert.equal(app.title(), "Gamma");
+  } finally { await app.close(); }
+});
+
+test("phone mail gesture preference persists independently and blocked mail stays unchanged", async () => {
+  const app = await mount(false, undefined, {}, [], 390);
+  const swipe = async (id: string) => {
+    const target = app.container.querySelector(`[id='mail-${id}']`)!;
+    await act(async () => {
+      for (const type of ["touchstart", "touchmove", "touchend"]) {
+        const point = { identifier: 1, clientX: type === "touchstart" ? 150 : 50, clientY: 100 };
+        const event = new app.window.Event(type, { bubbles: true, cancelable: true });
+        Object.defineProperties(event, { touches: { value: type === "touchend" ? [] : [point] }, changedTouches: { value: [point] } });
+        target.dispatchEvent(event);
+      }
+    });
+  };
+  let saved = "";
+  try {
+    await app.click(app.button("Show sidebar"));
+    await swipe("a:2");
+    assert.equal(app.mailActions.length, 0, "drawer makes the underlying mail inert");
+    await app.click(app.button("Hide sidebar"));
+    await app.click(app.button("Show sidebar"));
+    await app.click(app.button("Settings"));
+    await app.click(app.button("Keyboard and mouse"));
+    const toggle = [...app.container.querySelectorAll("label")].find(label => label.textContent === "Phone mail gestures")!.querySelector<HTMLInputElement>("input")!;
+    await app.click(toggle);
+    saved = app.storage.getItem("emc2.interaction.v1")!;
+    assert.equal(JSON.parse(saved).mailGestures, false);
+    assert.equal(JSON.parse(saved).touchNavigation, true);
+    await app.click(app.button("Close settings"));
+    await swipe("a:2");
+    assert.equal(app.mailActions.length, 0);
+  } finally { await app.close(); }
+  const restored = await mount(false, (_state, storage) => storage.setItem("emc2.interaction.v1", saved), {}, [], 390);
+  try { assert.equal(restored.container.querySelector("[data-mail-gestures]"), null); }
+  finally { await restored.close(); }
+});
+
+
+test("mail swipe guards keep syncing, sent, archived and desktop mail unchanged", async () => {
+  for (const guard of ["sync", "sent", "archived", "desktop", "wide"] as const) {
+    const app = await mount(false, state => {
+      if (guard === "sync") state.syncing = true;
+      if (guard === "sent") state.messages[0].direction = "sent";
+      if (guard === "archived") state.messages[0].archived = true;
+    }, {}, [], guard === "desktop" ? undefined : guard === "wide" ? 1200 : 390);
+    try {
+      if (guard === "sent" || guard === "archived") {
+        await app.click(app.button("Show sidebar"));
+        await app.click(app.button("All cached"));
+      }
+      const target = app.container.querySelector("[id='mail-a:1']")!;
+      assert.ok(target);
+      await act(async () => {
+        for (const type of ["touchstart", "touchmove", "touchend"]) {
+          const point = { identifier: 1, clientX: type === "touchstart" ? 150 : 50, clientY: 100 };
+          const event = new app.window.Event(type, { bubbles: true, cancelable: true });
+          Object.defineProperties(event, { touches: { value: type === "touchend" ? [] : [point] }, changedTouches: { value: [point] } });
+          target.dispatchEvent(event);
+        }
+      });
+      assert.equal(app.mailActions.length, 0, guard + " must not archive");
+    } finally { await app.close(); }
+  }
 });

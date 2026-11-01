@@ -1,5 +1,6 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useContext, useEffect, useRef, type ReactNode } from "react";
 import { Close } from "./icons";
+import { NotificationHostContext } from "./Toasts";
 
 export function Dialog({
   title,
@@ -21,6 +22,10 @@ export function Dialog({
   initialFocus?: "close";
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const registerNotifications = useContext(NotificationHostContext);
+  useEffect(() => {
+    if (ref.current) return registerNotifications?.(ref.current);
+  }, [registerNotifications]);
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
@@ -71,13 +76,10 @@ export function Dialog({
     };
   }, []);
   return (
-    <div className={toolbarAccess ? "dialog-backdrop compose-backdrop" : "dialog-backdrop"}>
+    <div className={toolbarAccess ? "dialog-backdrop compose-backdrop" : "dialog-backdrop"}
+      role="dialog" aria-modal={toolbarAccess ? undefined : true} aria-label={title} data-dialog-panel={className} ref={ref}>
       <div
         className={className ? `dialog ${className}` : "dialog"}
-        role="dialog"
-        aria-modal={toolbarAccess ? undefined : true}
-        aria-label={title}
-        ref={ref}
       >
         <div className="dialog-title">
           <h2>{title}</h2>

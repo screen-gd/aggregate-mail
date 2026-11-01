@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import type { ComposePreferences } from "../../shared/mail-features";
 import type { Account } from "../../shared/types";
@@ -38,8 +39,8 @@ export function ComposeSettings({ accounts, value, draft: retainedDraft, onDraft
   const [selected, setSelected] = useState("");
   const [accountId, setAccountId] = useState(accounts[0]?.id || "");
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
+  const [status, setStatus] = useFeedbackState("success");
+  const [error, setError] = useFeedbackState();
   const dirty = useRef(false);
   const saveLock = useRef(false);
   useEffect(() => { if (retainedDraft === undefined && !dirty.current) setLocalDraft(value); }, [value, retainedDraft]);
@@ -70,7 +71,7 @@ export function ComposeSettings({ accounts, value, draft: retainedDraft, onDraft
     finally { saveLock.current = false; setSaving(false); }
   }}>
     <h2>Templates</h2>
-    <p className="note">Reusable plain text for new messages and replies. Save changes before inserting them in a message.</p>
+
     <div className="settings-group">
       {draft.templates.length > 0 && <div className="settings-row stacked"><span id={`${prefix}-template`}>Template</span>
         <Segmented labelledBy={`${prefix}-template`} value={template ? selected : ""} disabled={() => disabled} onChange={setSelected}
@@ -94,7 +95,7 @@ export function ComposeSettings({ accounts, value, draft: retainedDraft, onDraft
       </div>
     </div>
     <h2>Signatures</h2>
-    <p className="note">Added to new messages and replies for the selected account.</p>
+
     {account ? <div className="settings-group">
       <div className={`settings-row${accounts.length > 1 ? " stacked" : ""}`}><span id={`${prefix}-account`}>Account</span>
         {accounts.length > 1 ? <Segmented labelledBy={`${prefix}-account`} value={account.id} disabled={() => disabled} onChange={setAccountId}
@@ -106,8 +107,8 @@ export function ComposeSettings({ accounts, value, draft: retainedDraft, onDraft
     </div> : <p className="muted">Connect an account to set its signature.</p>}
     <div className="compose-settings-save">
       <button className="button" type="submit" disabled={disabled}>{saving ? "Saving" : "Save compose preferences"}</button>
-      {error && <p role="alert">{error}</p>}
-      {status && <p role="status">{status}</p>}
+      {error && <Notice text={error} />}
+      {status && <Notice text={status} kind="success" />}
     </div>
   </form>;
 }

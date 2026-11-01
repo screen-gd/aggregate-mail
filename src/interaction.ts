@@ -38,11 +38,15 @@ export type Shortcut = { key: string; prefix?: string; ctrl?: boolean; meta?: bo
 export type InteractionPreferences = {
   opening: "double" | "single";
   mouseHistory: boolean;
+  touchNavigation: boolean;
+  mailGestures: boolean;
   shortcuts: Record<InteractionAction, Shortcut>;
 };
 export const defaults: InteractionPreferences = {
   opening: "double",
   mouseHistory: true,
+  touchNavigation: true,
+  mailGestures: true,
   shortcuts: Object.fromEntries(interactionActions.map((action) =>
     [action.id, { key: action.key, alt: "alt" in action && action.alt, shift: "shift" in action && action.shift, ...("prefix" in action ? { prefix: action.prefix } : {}) }])) as InteractionPreferences["shortcuts"],
 };
@@ -103,6 +107,8 @@ export function read(): InteractionPreferences {
     if (!stored || typeof stored !== "object") return fallback();
     const input = stored as Record<string, unknown>;
     const value = fallback();
+    if (typeof input.touchNavigation === "boolean") value.touchNavigation = input.touchNavigation;
+    if (typeof input.mailGestures === "boolean") value.mailGestures = input.mailGestures;
     if (typeof input.mouseHistory === "boolean") value.mouseHistory = input.mouseHistory;
     if (input.opening === "single") value.opening = "single";
     if (!input.shortcuts || typeof input.shortcuts !== "object") return value;
@@ -130,7 +136,7 @@ export function save(value: InteractionPreferences): boolean {
   if (!["double", "single"].includes(value.opening) || interactionActions.some(({ id }) => validateShortcut(id, value.shortcuts[id], value))) return false;
   try {
     // Serialize only the preference contract, never unrelated object fields.
-    localStorage.setItem(storageKey, JSON.stringify({ opening: value.opening, mouseHistory: value.mouseHistory,
+    localStorage.setItem(storageKey, JSON.stringify({ opening: value.opening, mouseHistory: value.mouseHistory, touchNavigation: value.touchNavigation, mailGestures: value.mailGestures,
       shortcuts: Object.fromEntries(interactionActions.map(({ id }) => [id, canonical(value.shortcuts[id])])) }));
     return true;
   } catch { return false; }
@@ -142,7 +148,7 @@ export function matches(event: KeyboardEvent, action: InteractionAction, value: 
   if (target && "closest" in target && typeof target.closest === "function" &&
     (target.closest('input, textarea, select, [role="combobox"], [contenteditable]:not([contenteditable="false"]), [data-interaction-settings]') ||
       target.closest('dialog, [role="dialog"]') && !(allowCompose && target.closest('.compose-dialog')) &&
-      !(target.closest('dialog, [role="dialog"]')?.matches('.settings-dialog') && ["search", "privacy", "back", "forward", "settings"].includes(action)))) return false;
+      !(target.closest('dialog, [role="dialog"]')?.matches('.settings-dialog, [data-dialog-panel~="settings-dialog"]') && ["search", "privacy", "back", "forward", "settings"].includes(action)))) return false;
   const binding = { ...shortcutFromEvent(event), ...(prefix ? { prefix } : {}) };
   if (same(binding, value.shortcuts[action])) return true;
   if (prefix) return false;

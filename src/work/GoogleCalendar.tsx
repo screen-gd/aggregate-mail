@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useContext, useState } from "react";
 import type { RendererState as State } from "../../shared/types";
 import type { CalendarEvents } from "./events";
@@ -9,22 +10,23 @@ import { PrivacyContext, Redact } from "../ui/Privacy";
 const states = { "not-connected": "Not connected", "needs-consent": "Needs consent", connected: "Connected", "api-disabled": "Calendar API disabled" };
 export function GoogleCalendar({ state, calendar, api, months, accountFilter }: { state: State; calendar: CalendarEvents; api: Api; months: string[]; accountFilter: string }) {
   const { on: privacy } = useContext(PrivacyContext);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const change = async (task: () => Promise<unknown>) => {
     setError("");
     const result = await calendar.mutate(task);
     if (!result.ok) setError("Google Calendar could not be updated. Refresh and try again.");
   };
   const accounts = state.accounts.filter((account) => account.provider === "gmail" && (accountFilter === "all" || accountFilter === account.id));
-  if (!accounts.length) return <p className="work-meta">Google Calendar sync is optional and needs a Gmail OAuth account. Emc² events stay on this device.</p>;
+  if (!accounts.length) return null;
   const visible = calendar.google.filter((value) => accounts.some((account) => account.id === value.accountId));
   const incomplete = accounts.some(account => !visible.some(value => value.accountId === account.id)) || !calendar.loaded || calendar.coverage.some(value => value.failed) || visible.some(value => value.stale || !value.syncedAt);
   const warning = visible.some((value) => value.status === "api-disabled") ? "Calendar API disabled" : visible.some((value) => value.status === "needs-consent") ? "Needs consent" : incomplete ? "Coverage incomplete" : "";
   return <>
-    {incomplete && <p className="work-meta" role="status">Google Calendar coverage is incomplete for this range. Cached events may be stale.</p>}
     <details className="google-calendar"><summary>Google Calendar{warning ? ` · ${warning}` : ""}</summary>
+    {incomplete && <p className="work-meta" role="status">Google Calendar coverage is incomplete for this range. Cached events may be stale.</p>}
+
     <p className="work-meta">Optional read sync. First Sync uses up to 20 Google-selected calendars. Choose Sync for each month. Synced events are read-only.</p>
-    {error && <p role="alert">{error}</p>}
+    {error && <Notice text={error} />}
     {accounts.map((account) => {
       const value = calendar.google.find((item) => item.accountId === account.id);
       const status = value?.status || "not-connected";

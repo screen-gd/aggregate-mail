@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import type { Api } from "../api";
 import { ATTACHMENT_BYTES } from "../../shared/attachments";
 import { useContext, useEffect, useRef, useState } from "react";
@@ -8,7 +9,7 @@ const imageTypes = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"
 function Attachment({ mailId, file, index, api }: { mailId: string; file: MailAttachment; index: number; api?: Api }) {
   const { on: privacy } = useContext(PrivacyContext);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const [preview, setPreview] = useState<{ bytes: Uint8Array; image?: string }>();
   const [url, setUrl] = useState<string>();
   const active = useRef(true);
@@ -70,7 +71,7 @@ function Attachment({ mailId, file, index, api }: { mailId: string; file: MailAt
     </div>
     {busy && <p role="status">Loading attachment… <button type="button" className="button" onClick={() => controller.current?.abort()}>Cancel download</button></p>}
     {!file.sizeIsEstimate && file.size > ATTACHMENT_BYTES && <p>Download limit: 25 MiB. Open this attachment in your provider.</p>}
-    {error && <p role="alert">{error}</p>}
+    {error && <Notice text={error} />}
     {preview && <div className="attachment-preview">
       {privacy && <p>Preview pixels may contain personal information.</p>}
       {preview.image ? <img src={preview.image} alt={`Attachment ${index + 1}`} onError={() => { setPreview(undefined); setUrl(undefined); setError("Image preview is unavailable. Download the file to open it."); }} /> : <p>Download this file to open it.</p>}

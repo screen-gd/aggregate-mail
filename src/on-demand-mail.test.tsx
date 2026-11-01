@@ -55,7 +55,7 @@ test("summary hydration preserves legacy content recovery and retry without imag
     assert.match(container.textContent || "", /Attachment metadata is not yet available/);
     assert.equal(container.querySelectorAll(".avatar-logo").length, 1, "the local sender avatar is separate from message image consent");
     assert.equal(container.querySelectorAll('[aria-label="Email content"] img').length, 0);
-    await act(async () => button("Try again").click());
+    await act(async () => button("Retry formatted email").click());
     assert.equal(contentAttempts, 2);
     assert.doesNotMatch(container.textContent || "", /Formatted email is unavailable/);
     assert.match(container.textContent || "", /synthetic.txt/);

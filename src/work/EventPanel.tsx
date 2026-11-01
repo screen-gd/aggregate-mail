@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { forwardRef, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Api } from "../api";
 import { CalendarActions } from "./InvitationActions";
@@ -23,7 +24,7 @@ export function EventForm({ initial, state, pending, existing, onSave, onCancel,
 }) {
   const [fields, setFields] = useState(() => normalizedFields(initial, state));
   const [baseline] = useState(() => normalizedFields(initial, state));
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const { on: privacy } = useContext(PrivacyContext);
   const set = (patch: Partial<EventFields>) => setFields((current) => ({ ...current, ...patch }));
   const lostAccount = !!initial.accountId && !state.accounts.some((account) => account.id === initial.accountId);
@@ -63,7 +64,7 @@ export function EventForm({ initial, state, pending, existing, onSave, onCancel,
       {state.accounts.map((account, index) => <option key={account.id} value={account.id}>{accountLabel(account, index, privacy)}</option>)}
     </select></label>
     {lostAccount && <p className="note">The original account is no longer connected. {fields.sourceMailId ? "Unlink the source email, then choose another account or keep No account." : "Choose another account or keep No account."}</p>}
-    {error && <p role="alert">{error}</p>}
+    {error && <Notice text={error} />}
     <div className="form-actions"><button type="button" onClick={onCancel} disabled={pending}>Cancel</button><button className="button" disabled={pending}>{pending ? "Saving…" : existing ? "Save changes" : "Save event"}</button></div>
     </fieldset>
   </form>;

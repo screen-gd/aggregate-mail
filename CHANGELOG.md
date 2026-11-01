@@ -14,14 +14,48 @@ unversioned history without treating it as a release record.
 - Keep Android mail parsing and TLS checks bounded and fail closed, and protect Send confirmation from screen capture. Isolate bootstrap benchmark authentication and provider settings. ([#181](https://github.com/collection-of-things/aggregate-mail/pull/181))
 - Validate decision-model keys as one pair with the effective provider, resolve backup account prefixes in a single bounded pass, and keep inbox classification linear on hostile subjects. Android now rejects mailbox counts and literal announcements before JavaMail allocates for them. ([#189](https://github.com/collection-of-things/aggregate-mail/pull/189))
 
+### Added
+
+- On phones, swipe a mail row left to archive, right to toggle read/unread, or hold to select. Mail gestures have their own switch in Keyboard and mouse settings; swipe actions pause during bulk selection. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Connect a phone to a headless host with `npm run phone:link`: open the private one-time link and save a passkey without a second host-screen approval. Existing QR pairing still requires matching-code approval. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
 ### Changed
 
 - Use the closing brand image for website link previews, replacing the old inbox screenshot with the Emc² logo and “Email at the speed of light. Inbox, weightless.” ([#190](https://github.com/collection-of-things/aggregate-mail/pull/190))
+- On phones, swipe right for Back and left for Forward, or swipe a notification to dismiss it. Turn navigation swipes off in Keyboard and mouse settings. Scrolling, zoom, form controls and browser edge gestures retain their normal behavior. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Remove repeated page descriptions and form coaching. Search options opens help and older-mail search on demand; operation errors and results use the notification stack. Browser notifications can chime after interaction and respect Sound off. Approval and recovery controls remain available. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Choose a full-width reader toolbar in Appearance: combine categories and action icons, show actions only, or keep two rows. The choice is saved and works in narrow windows too. Inactive Inbox tabs show their icon and unread count; the active tab keeps its full name. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Use the full Emc² logo, including its symbol, in the sidebar and sign-in pages, with matching app icons for browser shortcuts and desktop icon formats. Light and dark logos follow the interface appearance. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Fit mail cards and notifications to their visible details, tighten Today, Projects, drafts and Settings spacing, and keep short confirmation messages and Undo together. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Keep the view name and search together in a compact toolbar, align sync status and Settings in the sidebar footer, and give calendar events more room beside a smaller month navigator. Dates show the full scheduled count and title-only previews; times and every entry remain available in the larger day list. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Bring the frontend rebuild layout to the current app: Workspace-first navigation with an account footer, source icons, a compact breadcrumb band, inset mail and draft previews, and document surfaces across reading, work, Calendar, Contacts and Settings. Comfortable mail cards keep their measured scrolling at every width; compact density remains available. Keep dark selection and scrolling date headings readable, preserve compact selection spacing, and open Accounts from the footer. The empty-account footer announces Connect an account. Keep current mail actions, rich drafts, attachments, scheduled sending and protected browser access. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
 - Rebuild the marketing site as a static Astro page, replacing the Lakebed capsule. It leads with a working demo inbox over a public-domain painting, then a keyboard command demo, interface crops, privacy cards, a comparison with Thunderbird, Mailspring and Spark, per-platform downloads and an FAQ. Download buttons link the exact installer for the visitor's system with its size and SHA-256 checksum from the latest release. Star and download counts load in the browser from the public GitHub API and stay hidden when unavailable. The header and footer link both GitHub and git.cafe. Any static host can serve the build. ([#184](https://github.com/collection-of-things/aggregate-mail/pull/184))
 - Count marketing-site page views with Vercel Web Analytics, which sets no cookies and reports only from a Vercel deployment with Analytics enabled. The desktop app still sends no telemetry. ([#184](https://github.com/collection-of-things/aggregate-mail/pull/184))
 - Give the marketing site light and dark themes. It follows the system setting until the visitor picks one with the header toggle, which is remembered. The dark theme is neutral black with white text, the demo inbox switches to the app's dark scheme, and each painting swaps to a public-domain night counterpart. ([#184](https://github.com/collection-of-things/aggregate-mail/pull/184))
 
 ### Fixed
+
+- Keep phone Contacts navigation compact, preserve horizontal Settings switches and round accent choices, and separate Agent review controls so they do not overlap. Move review guidance, connection setup, file limits and undo explanations into optional help; omit attachment counts on empty drafts. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Center selection checkboxes within mail cards and wrap bulk counts, sync waits and actions to keep every control reachable. Sent-only selections show only Pin, Unpin and Move to Trash. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Give phone and tablet mail the available reading width, keep every Inbox category reachable through a compact picker, and use readable cards in both density settings. Phone cards use smaller outer gaps without shifting text during selection. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Accept fresh phone setup links in an already open pairing tab, resume approval after browser history restores the page, and keep late responses from disabling the current invitation. Connection errors no longer claim that another setup is waiting. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Preserve mail-list scroll during background content updates, keep bulk controls reachable with larger text, and prevent unread dots from covering timestamps. Headless setup accepts trailing-slash host URLs, avoids loading profile data and explains sync/update waits. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Keep mail text aligned when selection checkboxes disappear, avoid scanning the mailbox again on each selection, show sync waits beside the selected count, and inset the Projects empty message. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Load the phone sign-in and pairing controls when the browser app is installed beneath a hidden directory. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 
 - Delete saved drafts without waiting for a full mail-cache scan. Unused attachments still count toward storage limits until cleanup, normally during the daily idle inventory; compact storage to reclaim them sooner. ([#180](https://github.com/collection-of-things/aggregate-mail/issues/180))
 - Keep the marketing site's feature demo windows inside their panel on phones instead of cutting off the left edge, and lighten the site's rendering: paintings render at no more than one device pixel, stay still on touch screens and narrow windows, and the canvases no longer keep a copy of each frame. ([#190](https://github.com/collection-of-things/aggregate-mail/pull/190))

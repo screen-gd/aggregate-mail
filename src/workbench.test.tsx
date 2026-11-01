@@ -188,7 +188,8 @@ async function mount(mode: "actions"|"calendar"|"projects"|"agents"|"assistants"
   let currentWork: WorkspaceState;
   const api:Api=async<T,>(url:string,method="GET",body?:unknown):Promise<T>=>{
     requests.push({url,method,body});let result:unknown={};
-    if(url==="/workspace"){
+    if(url==="/outbox")result=[];
+    else if(url==="/workspace"){
       if(refreshFailure)throw new Error("Synthetic refresh failure");
       const snapshot=structuredClone(workspace);
       if(holdReads)return new Promise<T>((resolve,reject)=>heldReads.push({release:()=>resolve(snapshot as T),fail:()=>reject(new Error("Synthetic held read failure"))}));
@@ -818,7 +819,7 @@ test("coverage account labels redact known private names without losing coverage
  }finally{await ui.close();}
 });
 
-test("templates keep source subjects out of private text and attributes and explain dates",async()=>{
+test("templates keep source subjects private and date controls concise",async()=>{
  const ui=await mount();try{
   await ui.click(ui.button("Add task"));
   await ui.click(ui.container.querySelector<HTMLInputElement>('input[type="radio"]')!);
@@ -828,15 +829,27 @@ test("templates keep source subjects out of private text and attributes and expl
   assert.equal(ui.field("What needs to happen").value,"");
   assert.ok(!ui.container.innerHTML.includes("Private Reader"));
   assert.ok(!ui.container.innerHTML.includes("reader@example.com"));
-  assert.ok(ui.container.textContent?.includes("Due date is the day the work is due"));
-  assert.ok(ui.container.textContent?.includes("Reminder is when to look again"));
+  assert.ok(ui.field("Due date"));
+  assert.ok(ui.field("Reminder"));
   assert.ok(ui.container.textContent?.includes("Choose the email this work starts from"));
   assert.equal(ui.requests.some(request=>request.method!=="GET"),false);
  }finally{await ui.close();}
 });
 
-for(const [mode,purpose] of [["actions","open tasks"],["calendar","Events, tracked work, follow-ups and snoozed mail"],["agents","Review changes before they run"]] as const)test(`${mode} explains its purpose`,async()=>{
- const ui=await mount(mode);try{if(mode==="actions")assert.equal(ui.container.querySelectorAll(".main-head .work-view-tabs button").length,3);else assert.ok(ui.container.textContent?.includes(purpose));assert.equal(ui.requests.some(request=>request.method!=="GET"),false);}finally{await ui.close();}
+for(const mode of ["actions", "calendar", "agents"] as const)test(`${mode} keeps its controls without an explanatory header`,async()=>{
+ const ui=await mount(mode);try{
+  assert.equal(ui.container.querySelector(".work-intro"),null);
+  assert.ok(ui.button("Refresh workspace"));
+  if(mode==="actions")assert.equal(ui.container.querySelectorAll(".main-head .work-view-tabs button").length,3);
+  if(mode==="calendar")assert.ok(ui.button("New event"));
+  if(mode==="agents"){
+   const help=ui.container.querySelector<HTMLDetailsElement>(".agent-review-help")!;
+   assert.ok(help);assert.equal(help.open,false);
+   assert.ok(help.textContent?.includes("Review the account, target and exact action"));
+   assert.equal(ui.container.querySelector(".agent-review-context"),null);
+  }
+  assert.equal(ui.requests.some(request=>request.method!=="GET"),false);
+ }finally{await ui.close();}
 });
 
 test("agent sections preserve setup entries and presets never add immediate creation rights", async () => {
@@ -927,7 +940,7 @@ test("calendar creates an Emc² event, shows it in the grid and day list, and ed
   assert.ok(detail()!.textContent!.includes("one@example.test")&&detail()!.textContent!.includes("Room 4")&&detail()!.textContent!.includes("Bring the numbers"));
   assert.ok(ui.container.textContent?.includes("Event added to your Emc² calendar."));
   const cell=ui.container.querySelector<HTMLButtonElement>(`button[aria-label="${day}, 1 scheduled"]`)!;
-  assert.ok(cell.querySelector(".calendar-chip")?.textContent?.includes("Design review"));assert.equal(cell.querySelector(".calendar-chips")?.getAttribute("aria-hidden"),"true");
+  assert.equal(cell.querySelector(".calendar-chip")?.textContent, "Design review", "compact previews start with the event title; time stays in the day list");assert.equal(cell.querySelector(".calendar-chips")?.getAttribute("aria-hidden"),"true");
   await act(async()=>detail()!.dispatchEvent(new ui.dom.window.KeyboardEvent("keydown",{key:"Escape",bubbles:true})));assert.equal(detail(),null,"Escape closes the event pane");
   await ui.click(cell);const row=ui.container.querySelector<HTMLButtonElement>(".calendar-agenda .calendar-event")!;assert.ok(row.textContent?.includes("Event"));
   await ui.click(row);assert.equal(row.getAttribute("aria-pressed"),"true");
@@ -974,8 +987,10 @@ test("calendar events follow the account filter and hide titles, places and atte
   await ui.click(ui.button("Refresh workspace"));await ui.filter("a");
   const cell=()=>ui.container.querySelector<HTMLButtonElement>(`button[aria-label="${day}, 2 scheduled"]`)!;
   await ui.click(cell());assert.ok(ui.container.textContent?.includes("Unassigned planning"));assert.ok(!ui.container.textContent?.includes("Other account sync"));
+  assert.equal(cell().querySelector(".calendar-day-heading small")?.textContent,"2","the compact day counts every entry");
+  assert.equal(ui.container.querySelectorAll(".calendar-agenda .calendar-event").length,2,"both events remain available in the day list");
   await ui.privacy();
-  assert.deepEqual([...cell().querySelectorAll(".calendar-chip")].map(chip=>chip.textContent?.replace(/^.*?(Event)$/,"$1")),["Event","Event"]);
+  assert.deepEqual([...cell().querySelectorAll(".calendar-chip")].map(chip=>chip.textContent?.replace(/^.*?(Event)$/,"$1")),["Event"]);
   await ui.click([...ui.container.querySelectorAll<HTMLButtonElement>(".calendar-agenda .calendar-event")].find(row=>!row.textContent?.includes("Unassigned"))!);
   const detail=ui.container.querySelector<HTMLElement>('[aria-label="Event details"]')!;
   for(const secret of ["Private Reader","reader@example.com","guest@example.test"])assert.ok(!ui.container.innerHTML.includes(secret),secret);

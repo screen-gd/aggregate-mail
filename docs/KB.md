@@ -72,9 +72,27 @@ separate acceptance.
 
 ## Phone pairing, passkeys and browser key bootstrap
 
+`npm run phone:link` creates a two-minute, one-use headless setup link using
+local recovery authentication and the normal API CSRF guard. `setup-link`
+stores authorization only on the server invitation and consumes it at claim.
+It never trusts client approval fields. Ordinary QR and phone-initiated requests
+still need matching-code approval. User-verified WebAuthn, claim expiry and
+route-lifetime checks remain mandatory. The CLI follows no redirects, accepts
+only the known login/logout 303 destinations, bounds responses and deadlines,
+and attempts logout after acquiring its temporary session. It reads only
+`{csrf}` from authenticated `GET /api/csrf`, avoiding profile-size limits from
+bootstrap rules. API authentication, Origin checks and `no-store` still apply.
+Recovery login replaces other localhost recovery sessions and consumes one of
+five login attempts per minute. Existing paired phones are unaffected. Sync
+and update-busy responses give retry-later guidance without automatic retries. See
+[ADR 0112](adr/0112-headless-phone-setup.md).
+
 `server/phone-passkeys.ts` mounts only the public `/auth/pair`, bundled client
 and named pairing/WebAuthn POST routes before session authentication. Gate
 Host/Origin checks apply first; remote POSTs require the exact verified origin.
+The fixed public client filename is served relative to the build directory so
+hidden parent directories do not trigger dotfile filtering. Other filenames
+and hidden files remain outside that public route.
 Host management uses the normal authenticated API and CSRF guard plus exact
 localhost Host/Origin checks.
 
@@ -178,6 +196,9 @@ immutable matching tag at the approved source commit and separate publication
 authority. Source version metadata does not establish installer acceptance.
 
 ## Responsiveness and composition
+
+Composer file limits and undo guidance use closed disclosures. Empty drafts omit
+the attachment count; selected files retain their count, size and removal controls.
 
 Gmail and Calendar share `server/google-api.ts`, which imports their specific
 installed Google API modules. Tests mock this same facade; no other API clients
@@ -286,13 +307,23 @@ macOS or Linux builds.
 
 ## Shared application styling
 
-The working layout uses a 208px main rail and names each view once in the
+The working layout uses a 200px main rail and names each view once in the
 persistent toolbar. Inbox categories and Drafts account tabs follow it without
 another title row. Work action and cached-mail bars keep their existing
 controls; Settings keeps its section heading. Category navigation sits outside
 the list column. Card
 heights and the list virtualizer share the tokens in `styles/tokens.css`;
 account metadata stays inside those measured rows.
+
+`emc2.appearance.v1.readerToolbar` saves `compact`, `actions` or `separate`.
+Missing or invalid values use `compact`. Settings > Appearance exposes all
+three full-width reader arrangements; narrow windows use the same preference.
+Only one `MailActions` instance renders for the opened message. Closing restores
+the category navigation and selection rail. Inactive category names remain
+accessible, while only the active name is visible on wide tab strips.
+Bulk selection grows with wrapped status and actions. Sent-only selections
+expose Pin, Unpin and Move to Trash, keeping confirmation and sync guards.
+Checkboxes stay vertically centered inside the stable 34px selection gutter.
 
 Today status navigation is local display state. Open groups are separated by
 deadline and waiting status; completed and cancelled work stays available.
@@ -312,7 +343,7 @@ Dialog backdrops and surfaces explicitly use `-webkit-app-region: no-drag`.
 This excludes their full bounds from native drag regions on pane headers
 behind them, including the composer account selector, Discard and Close.
 
-The current renderer adds a view breadcrumb to the main toolbar and account
+The current renderer keeps the view name beside search in the main toolbar and account
 tabs to Drafts. Those tabs use the existing navigation account filter. Their
 counts are hidden when a list read fails. Recipient-first draft rows keep
 account and saved-time context. Calendar places Add task in its view toolbar.
@@ -563,7 +594,7 @@ Omitted evidence fields preserve existing links during partial updates.
 the selected account scope, with an overdue list. Open work without a deadline or
 follow-up appears on today's date as "No deadline" until it is scheduled or
 closed. Today keeps the selected work and its email in the right pane whenever
-the window is at least 980 px wide, regardless of the mail reading-pane setting.
+the window is at least 1200 px wide, regardless of the mail reading-pane setting.
 Today updates its
 in-app follow-up notice once per minute. There is no background reminder service
 or external calendar integration. [ADR 0043](adr/0043-built-in-follow-up-calendar.md)
@@ -789,7 +820,7 @@ account column for a selected account. Labels reuse `accountLabel`, including
 duplicate names, privacy redaction and unavailable-account fallback; row
 accessible names include the permitted account and status. Account dots match
 sidebar order and repeat after four accounts. Narrow rows put metadata below
-the sender. The compact narrow height is 72px in both CSS tokens and windowing
+the sender. Narrow card heights include only enabled metadata and nonempty previews in windowing
 fallbacks. Sender avatars omit provider overlays. Status visibility follows
 message importance; only May need labels take the existing reason colour.
 
@@ -1406,6 +1437,15 @@ Find pinned mail is a cached `is:pinned` search, not a separate state. The Filte
 
 The service increments an in-memory `unreadArrivals` count only for arrivals already accepted by its existing sync notification rules. App suppresses its initial snapshot and reports newly accepted arrival sequences on later reloads. The service retains a bounded in-memory journal of exact IDs and sanitized details, pruning removed mail while preserving surviving sequence numbers and the cumulative count. Legacy count-only snapshots use generic notices. Repeated state reads do not repeat a notice; the service counter resets on restart. Each observed arrival batch gets a distinct event ID so equal-sized batches keep separate notices. `src/ui/Toasts.tsx` retains queued outcomes, renders four at a time, masks text with Redact and pauses informational expiry during hover/focus. Errors and delivery warnings remain until dismissed. This supplements native notifications; it does not introduce another sync loop.
 
+Page feedback uses `Notice` and `NotificationProvider` in `src/ui/Toasts.tsx`.
+The provider reuses the existing queue and privacy redaction. `Dialog` registers
+a notification host while open; nested dialogs use the latest host and restore
+the previous one on close. Errors survive page changes and remain until dismissed.
+Field descriptions keep their IDs without a visible error paragraph. Browser
+audio is unlocked by a gesture, coalesces notices within half a second, and
+respects the existing sound preference; unavailable audio leaves text unaffected.
+Desktop audio is unchanged. Physical browser audio remains separate acceptance.
+
 Settings, Notifications customizes floating in-app arrivals and action confirmations independently. Position can be Bottom right, Bottom center or Top right; duration can be 3, 6 or 10 seconds or Until dismissed. Defaults enable both categories at Bottom right for six seconds. Preview works with both categories disabled, and reset restores defaults. Validated display preferences use the `emc2.notifications.v1` localStorage key. Duration changes apply to future notices; queued and visible notices retain their original duration. Storage failure keeps the current selection in memory and reports the save failure. Errors and uncertain-send warnings cannot be disabled or timed out by these choices. Independent desktop delivery, optional sender/subject/preview details, exact-email opening and system/off/custom audio extend these preferences. All details default off and remain generic in privacy mode. A native chooser imports regular WAV/MP3/Ogg files up to 2 MiB, storing bytes without the source path or name. Playback stops after 30 seconds. Reset removes imported audio. See [ADR 0040](adr/0040-customizable-in-app-notifications.md) and [ADR 0050](adr/0050-notification-details-and-local-audio.md).
 
 Snooze confirms the selected local return date and time. Return to inbox, Archive and Trash also produce success confirmations. Success follows the confirmed action, before refreshing the cache. A subsequent refresh failure reports the confirmed result with a separate refresh warning, rather than suggesting the action failed or should be repeated. Mounted synthetic action and notification tests cover these outcomes; physical input, native appearance and live-provider delivery are separate proof.
@@ -1649,6 +1689,24 @@ Missing account filters return to All. Drafts and dialogs block traversal.
 Escape retains the existing close-email, close-dialog and draft-confirmation
 behavior. Closing or changing the reader clears remote-image consent.
 
+Phone browsers below 760px use `src/ui/useSwipe.ts` for Back/Forward in the
+main content pane. The `touchNavigation` interaction preference defaults on
+and persists per browser. A single-finger horizontal swipe must travel 64px
+within 700ms. Vertical movement cancels recognition before scrolling is
+intercepted. Controls, text selection, horizontal scrollers, pinch zoom and
+browser edges remain native. Dialogs, compose, busy work and an open sidebar
+block navigation. Notifications use the same recognizer for dismissal.
+`src/touch-gestures.test.tsx` and mounted navigation/toast checks cover these
+paths synthetically; physical phone gesture acceptance remains separate.
+
+The separate `mailGestures` preference defaults on for phone browser mail rows.
+Left swipe calls the existing Archive menu action, right swipe calls Read or
+Unread, and a stationary 450ms hold toggles bulk selection. Rows claim gestures
+before history navigation; bulk selection blocks row swipe actions. Action
+availability, sync and modal guards remain in App and BulkMailSelection.
+Movement, cancellation, blur, unmount and disabled controls cancel pending holds.
+Gesture-generated clicks are suppressed without blocking keyboard activation.
+
 On Windows and Linux, [Electron main](../desktop/main.ts) forwards the
 documented `app-command` values `browser-backward` and `browser-forward`
 through the [preload bridge](../desktop/preload.ts). The renderer suppresses
@@ -1733,7 +1791,7 @@ Replies use the safe formatted reader for the original message. Reopened drafts 
 
 [Privacy matching](../src/privacy.ts) learns names from optional account display names and the current To/Cc display names tied to connected account addresses. It covers full names, first names and surnames, including one-letter Unicode components, with Unicode-aware boundaries, case/whitespace variation and URL encoding. The opened message's dictionary also protects Gmail label filter options and the label editor. A sender avatar uses a neutral dot when its displayed initial matches a known private name component; ordinary company initials stay visible. Sender-markup splits cannot expose a known name. Hidden bars have no private children, title or accessibility text. Explicit reveal applies to the clicked token; re-enabling privacy clears it. Unknown names that appear only in a body cannot be identified. A name that is also an ordinary word can hide that word while privacy is on. Editable compose fields retain their focus-to-reveal behavior.
 
-[Inbox tabs](../shared/inbox-tabs.ts) are derived on the client from Teach rules, personal-mail patterns, Gmail `CATEGORY_*` labels, the sorter's reason and sender/subject patterns; nothing new is stored, and the server's `important`/`other` category still drives MCP, relevance and Teach. The selected tab is part of the in-memory navigation location. The sidebar open state is stored as `sidebar` (`open` or `closed`) in localStorage, beside `window-controls`. The removed sender panel left an unused `sender-panel` key, which is ignored. A persistent toolbar contains search and Commands above the pane headers, plus the Filters and privacy buttons while the mail list shows; each pane's secondary controls share its header's title line. A closed sidebar stays mounted with `inert` so it can animate. [App](../src/App.tsx) decides which panes are on screen with [`useMedia`](../src/ui/useMedia.ts) (the sidebar needs 760px, the reader beside the list 980px). With Side by side selected, the mail list keeps its column even before opening an email and after closing it; the adjacent reader shows opening guidance until mail is opened. F6 skips this empty reader until an email is open. Full width and windows below 980px use one column. The renderer gives the window controls to the header in each corner through [`PaneHeader`](../src/shell/PaneHeader.tsx); without `matchMedia` (the renderer tests) every pane counts as present. [Appearance](../src/appearance.ts) stores mode (`system`, `light` or `dark`; dark by default), theme, accent, transparency (`off`, `subtle` or `glass`; an earlier boolean `glass` is migrated), reading layout (`split` or `full`) under `emc2.appearance.v1`.
+[Inbox tabs](../shared/inbox-tabs.ts) are derived on the client from Teach rules, personal-mail patterns, Gmail `CATEGORY_*` labels, the sorter's reason and sender/subject patterns; nothing new is stored, and the server's `important`/`other` category still drives MCP, relevance and Teach. The selected tab is part of the in-memory navigation location. The sidebar open state is stored as `sidebar` (`open` or `closed`) in localStorage, beside `window-controls`. The removed sender panel left an unused `sender-panel` key, which is ignored. A persistent toolbar contains search and Commands above the pane headers, plus the Filters and privacy buttons while the mail list shows; each pane's secondary controls share its header's title line. A closed sidebar stays mounted with `inert` so it can animate. [App](../src/App.tsx) decides which panes are on screen with [`useMedia`](../src/ui/useMedia.ts) (the sidebar needs 760px, the reader beside the list 1200px). With Side by side selected, the mail list keeps its column even before opening an email and after closing it; the adjacent reader shows opening guidance until mail is opened. F6 skips this empty reader until an email is open. Full width and windows below 1200px use one column. The renderer gives the window controls to the header in each corner through [`PaneHeader`](../src/shell/PaneHeader.tsx); without `matchMedia` (the renderer tests) every pane counts as present. [Appearance](../src/appearance.ts) stores mode (`system`, `light` or `dark`; dark by default), theme, accent, transparency (`off`, `subtle` or `glass`; an earlier boolean `glass` is migrated), reading layout (`split` or `full`) under `emc2.appearance.v1`.
 A stored legacy `sizeByImportance` key is ignored. It applies them as `data-scheme`, `data-theme`, `--accent` (a deeper shade in light mode) and `data-glass` on the document root; System follows `prefers-color-scheme`. The preload exposes `desktop.materials`, true on macOS and on Windows build 22621 or later; `desktop.setMaterial`, which sends `window-material` (`none`, `mica` or `acrylic`), accepted only from the app window and only on Windows; and `desktop.setScheme`, which sends `window-scheme` and sets `nativeTheme.themeSource` so materials, native menus and System follow the mode. The main process starts dark until the renderer reports its mode. [ADR 0022](adr/0022-window-materials-and-themes.md) records the window material decision and [ADR 0025](adr/0025-light-mode-and-reading-pane.md) the modes and reading layout.
 
 Window chrome outside macOS ([ADR 0026](adr/0026-native-window-chrome.md)): the main process reads `window.json` (`{"controls":"mac"|"windows"}`) from the app data folder when it creates the window; anything unreadable means the drawn lights. Windows style creates the window with `titleBarOverlay` and passes `--emc2-window-controls=windows` to the preload, which exposes `desktop.windowControls`. `window-controls` (from the current window main frame at the app origin only) saves the choice and, if it changed, closes through the native draft guard and, only after accepted closure, opens a new window at the old bounds; the renderer refuses while a draft is open or sending. `window-overlay` sets the caption colors (validated `#rrggbb`) from the renderer's `--surface` and `--text`. Mail rows call `desktop.mailMenu`, which sends `mail-menu` to `ipcMain.handle`; [window-chrome](../desktop/window-chrome.ts) checks item ids, labels, enabled flags, display-only accelerators and position, and the main process pops a native menu and returns the chosen id (or null after the menu closes). Without the bridge the drawn menu is used. Folded sidebar sections are stored as `sidebar-folded` in localStorage.
@@ -1851,7 +1909,7 @@ expanded. See [ADR 0048](adr/0048-v2-persistent-navigation.md).
 
 ## V2 visual correction
 
-The V2 sidebar uses separate Mail and Workspace groups (Mail first) at 208px, with Settings
+The V2 sidebar uses separate Workspace and Mail groups (Workspace first) at 200px, with Settings
 anchored at the bottom. Agent review keeps existing assistant cards above a
 collapsible add form. Permissions, BYOK and external connection setup stay in
 each card; hiding a section preserves its state and approval guards. Projects
@@ -2771,9 +2829,48 @@ Agent review fills its working pane rather than capping the review grid at 1120p
 
 Browser API integration authenticates each request with either the desktop per-launch token or the expiring browser gate session. The gate replaces the earlier terminal session link; it does not add a second sign-in step. OAuth start remains authenticated and CSRF-protected, single-use launch/state records remain capped, and the approved browser origin is retained through callback. `server/browser-session.test.ts` uses a temporary synthetic profile and ephemeral port to verify login, refusal, CSRF, origin and lock behavior without using another service's listener. Phone access uses verified private Tailscale HTTPS with the backend bound only to loopback; a high port alone provides no encryption.
 
+### Frontend rebuild
+
+The current renderer carries the `feat/frontend-rebuild` layout through
+`src/styles/frontend-rebuild.css`, imported after `application.css` and before
+`responsive.css`. The 200px sidebar places Workspace before Mail and ends in a
+privacy-safe account summary using the existing account-settings navigation.
+The source branch's compose and draft icons are included. Web chrome is 40px;
+desktop retains native caption space. The compact view-and-search toolbar,
+etched separators, inset list cards and document panels apply across Mail, Drafts, Today, Projects,
+Agent review, Calendar, Contacts and Settings.
+
+Comfortable MailList uses its card layout at every width and passes that same
+choice to MailListWindow. Card heights use a 54px sender/subject base, 18px for
+visible metadata and 20px for nonempty comfortable previews, all text-scaled.
+Compact wide rows stay 24px; compact cards omit previews. Row controls, bulk selection, scrolling, focus, account
+identity and all current handlers remain shared. The list uses the existing
+measured card tokens rather than changing heights only in CSS. Date headings
+cover scrolling rows outside glass mode; compact bulk cards keep the checkbox
+gutter. The account footer always opens Accounts and includes its masked label
+in the accessible name. With no accounts, that name includes Connect an account.
+Draft tabs retain their 42px composer offset, and the composer footer uses the
+shared measured track. Themes, privacy,
+rich drafts, attachments, scheduled sending, browser protection and About/update
+checks retain their current components. The sync footer keeps the shared 42px
+track, with status left and Settings right. Calendar uses a 296px month navigator
+and gives the remaining width to larger event rows. A named container query
+stacks the month and day list at 660px or less of available calendar width, including
+when an inspector opens. Coarse pointers use a 336px month column. Each date
+shows one title-only event preview of at most two lines and the total count; the day list
+retains times and all events, tasks and snoozes. Calendar reads, explicit sync
+and selection handlers are unchanged.
+
+Use the [journey map](user-journeys.md) for mounted synthetic checks. A build or
+interaction test does not establish browser/device geometry or real provider
+behavior. Live browser testing remains restricted by PRODUCT.md.
+
 ### Mobile browser layout
 
 Below 760px, Settings uses a native section picker while desktop retains the section rail. The picker uses the existing section navigation and save guards. Mobile Settings fills the available viewport, descriptions wrap, and form text remains at least 16px. Reply context stacks above the editor and remains independently scrollable. Touch controls, including the primary New Message action, target 44px and respect browser safe areas. Responsive CSS loads after application styles so compact desktop rules cannot override these sizes. The viewport requests content resizing for supported Android keyboards. `src/navigation.test.tsx` covers the phone picker, drawer and theme persistence with synthetic state; actual keyboard and screen geometry require device verification.
+
+Phone Contacts uses content-sized navigation rows so the section picker cannot consume the empty viewport. Labeled Settings switches keep their horizontal track inside the touch-sized row. Phone accent choices keep 32px circular targets and wrap when needed. Work header controls wrap separately from Agent review tabs. Review guidance is collapsed under About review and permissions; Google connection and sorting disclosures appear inside their setup section before its fields.
+
 
 Changelog and release notes follow [CONTRIBUTING.md](../CONTRIBUTING.md#changelog-and-release-notes). Versioned entries identify release changes; [legacy development notes](changelog-legacy.md) preserve the earlier unversioned history. The release owner verifies the published body matches the version section before declaring publication complete.
 
@@ -3003,8 +3100,8 @@ It shares App's density state with Commands and the configured density shortcut.
 Explicit changes save `emc2.density` on this device; startup reads the saved value
 without writing it. A failed save keeps the session value and shows a notice.
 Density changes spacing independently of text scale.
-The virtual list retains existing wide and narrow row-height tokens, including
-72px compact cards. Density and text-scale changes scroll the selected row into
+The virtual list retains 24px compact wide rows and computes narrow card
+heights from visible metadata and preview content. Density and text-scale changes scroll the selected row into
 view without taking focus from Settings or editors. Passive scrolling and mail
 refreshes retain their existing behavior. Synthetic coverage is in
 `src/list-windowing.test.tsx` and the persistent-density case in
@@ -3375,3 +3472,65 @@ invalidates that confirmation. Restored drafts retain text and attachments but
 lose invitation and calendar-context authority; prepare calendar drafts again
 from the current event or source before sending calendar data. See
 [ADR 0110](adr/0110-reviewed-unverified-calendar-imports.md).
+
+### Content-driven interface spacing
+
+MailList supplies visible metadata and preview flags to MailListWindow, which
+assigns each rendered slot its calculated height. CSS fills that slot; the same
+selection gutter remains when checkboxes are absent. Bulk selection memoizes its
+identity index per immutable message array and keeps sync status beside the
+selected count. Sync continues to block provider actions, not local selection.
+Today task rows, Projects, drafts and Settings use compact natural spacing.
+Notification widths and heights follow enabled text and actions, with inline
+Undo on short confirmations. Existing privacy, focus, expiry and error behavior
+remain covered by `src/toasts.test.tsx`; row and selection contracts are covered
+by `src/row-actions.test.tsx`, `src/list-windowing.test.tsx` and `src/bulk-mail.test.tsx`.
+`src/message-style.test.tsx` renders MailList with its virtual-row wrappers and
+the complete stylesheet cascade. It checks the 34px selection gutter in both
+densities and list widths, with checkboxes absent, unchecked and checked. Present
+checkboxes must retain absolute positioning at a 10px left offset.
+
+### Phone pairing tab navigation
+
+The public pairing client handles invitation fragments on both initial load and
+same-document navigation. Each new attempt clears the fragment before making a
+request and ignores responses from earlier attempts. Restoring a page from the
+browser history cache resumes its cookie-bound approval without replaying the
+invitation; restoring the sign-in page also re-enables Connect. Registration
+remains disabled until the current claim is approved.
+Connection failures show setup guidance without asserting that another request
+exists. Synthetic navigation, stale-response and restore coverage is in
+`scripts/phone-auth.test.mjs`; native passkey prompts need separate device proof.
+
+### Phone and tablet mail layout
+
+Below 1200px, mail opens in the list pane instead of reserving an empty adjacent
+reader. Both density settings use measured card rows at these widths. Inbox
+categories use a native select with all six categories and their unread counts;
+it calls the existing category navigation and yields the rail to bulk actions.
+Wide windows retain tabs and the saved reading layout. The 760px sidebar drawer
+boundary is unchanged. Phone cards retain the stable 34px selection gutter while
+using 8px list edges, a 24px avatar and an 8px avatar gap.
+
+`src/navigation.test.tsx` covers tablet reading, category filtering and compact
+phone cards. List windowing, row actions, selection and stylesheet tests cover
+the shared geometry. See [ADR 0113](adr/0113-responsive-mail-layout.md).
+
+### Application branding assets
+
+`public/brand` holds the Mass/Lumen wordmarks and horizontal lockups, the 192px
+browser icon and the 180px Apple touch icon. Vite copies these production assets
+to `dist/brand`. The sidebar switches full horizontal lockups, including the
+symbol, with the resolved app scheme and scales them to fit window controls;
+public browser-access pages select the lockup using system color scheme.
+`build/icon.png` is the 1024px default dark app icon. `build/icon.ico` contains
+16, 24, 32, 48, 64, 128 and 256px representations; `build/icon.icns` contains the
+macOS representations. The tray asset uses the same artwork. No app identifier,
+profile, keychain, signing or release behavior changes with these assets.
+
+The browser gate serves only the six named brand files before authentication,
+with existing origin checks and no-store responses. Its authentication-page CSP
+allows same-origin images. Other asset paths and mailbox APIs remain protected.
+`server/browser-access.test.ts` covers this boundary, including unlisted files,
+traversal attempts and foreign origins. Native installed icon appearance and
+home-screen icon caching require separate device verification.

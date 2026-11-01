@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { accountStatus } from "../account-status";
 import { WorkspaceBackup } from "./WorkspaceBackup";
 import { notificationDefaults, type NotificationPreferences } from "../notifications";
@@ -96,7 +97,7 @@ export function SettingsPage({
 }) {
   const { on: privacy, names } = useContext(PrivacyContext);
   const [renaming, setRenaming] = useState<string | null>(null);
-  const [renameError, setRenameError] = useState("");
+  const [renameError, setRenameError] = useFeedbackState();
   const scrollPane = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => { scrollPane.current?.scrollTo({ top: 0, behavior: "instant" }); }, [section]);
   useLayoutEffect(() => {
@@ -130,7 +131,7 @@ export function SettingsPage({
         </div>)}
       </nav>}
       <div className="settings-column" ref={scrollPane}>
-        <header className="settings-section-heading"><span className="settings-section-context">{settingsGroup(section)}</span><h1>{current.label}</h1><p>{current.description}</p></header>
+        <header className="settings-section-heading"><h1>{current.label}</h1></header>
         {section === "phone-access" && <PhoneAccessSettings api={api} onCopied={onCopied} />}
         {section === "interaction" && <section>
           <InteractionSettings value={interaction} onChange={onInteraction} />
@@ -205,14 +206,14 @@ export function SettingsPage({
             draft={composeDraft} onDraftChange={onComposeDraft} onSave={onComposePreferences} busy={busy || composeSaving} />
         </section>}
         {section === "sorting" && <section>
-          <p className="note">
+          <details className="settings-help"><summary>Sorting details</summary><p className="note">
             {state.jevConfigured
               ? `AI sorting is configured for Jev through ${jevProviders[state.jevProvider].name}. Sender, subject and preview text of new mail are sent to that provider.`
               : state.aiConfigured
                 ? "AI sorting is configured for OpenAI. Cached message content and metadata, including sender, subject and preview text, are sent to OpenAI."
                 : "Local sorting is on. Optional AI sorting keys are under Google and connections."}{" "}
             Sender rules take priority. Use Teach on any email to correct it.
-          </p>
+          </p></details>
           {state.rules.length ? (
             <div className="settings-group">{state.rules.map((rule) => (
               <div className="rule-row" key={rule.id}>
@@ -247,17 +248,17 @@ export function SettingsPage({
           )}
         </section>}
         {section === "connection" && <section>
-          <p className="note">
-            {state.googleConfigured ? "Google sign-in setup is saved. Connect an account under Accounts."
-              : "Google sign-in needs an OAuth client from Google Cloud. Gmail with an app password connects under Accounts without this setup, if Google permits it."}
-          </p>
-          <p className="note">
-            Sorting keys are optional. Jev uses the selected decision model provider; OpenAI is used when no Jev key is saved.
-            AI sorting sends sender, subject and preview text to its provider. OpenAI also receives cached message content and metadata.
-            Without a key, sorting stays local.
-          </p>
           <details className="settings-group settings-details">
             <summary>Google setup and sorting keys</summary>
+            <p className="note">
+              {state.googleConfigured ? "Google sign-in setup is saved. Connect an account under Accounts."
+                : "Google sign-in needs an OAuth client from Google Cloud. Gmail with an app password connects under Accounts without this setup, if Google permits it."}
+            </p>
+            <p className="note">
+              Sorting keys are optional. Jev uses the selected decision model provider; OpenAI is used when no Jev key is saved.
+              AI sorting sends sender, subject and preview text to its provider. OpenAI also receives cached message content and metadata.
+              Without a key, sorting stays local.
+            </p>
             {!state.googleConfigured && (
               <div className="setup">
                 <ol>
@@ -338,12 +339,7 @@ export function SettingsPage({
                   </label>
                 )}
               </div>
-              <p className="note">
-                {drawsWindowControls
-                  ? "macOS style draws three colored controls that close, minimize and maximize the window. They dim while another window has focus."
-                  : "Windows style uses the system's own minimize, maximize and close buttons, including snap layouts."}{" "}
-                Switching reopens the window in place.
-              </p>
+
             </>
           ) : window.desktop?.platform === "darwin" ? (
             <p className="note">
@@ -393,6 +389,6 @@ function AccountNameForm({ account, busy, error, onSave, onCancel }: {
       aria-describedby={error ? `${inputId}-error` : undefined} />
     <button type="submit" className="button" disabled={busy}>Save</button>
     <button type="button" className="button" disabled={busy} onClick={onCancel}>Cancel</button>
-    {error && <p id={`${inputId}-error`} role="alert">{error}</p>}
+    {error && <Notice text={error} id={`${inputId}-error`} />}
   </form>;
 }

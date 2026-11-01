@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useContext, useEffect, useRef, useState } from "react";
 import type { PhoneDevices } from "../../shared/phone-access";
 import type { Api } from "../api";
@@ -7,7 +8,7 @@ export function PhonePairingSettings({ api, canPair }: { api: Api; canPair: bool
   const { on: privacy } = useContext(PrivacyContext);
   const [value, setValue] = useState<PhoneDevices>({ devices: [] });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const active = useRef(true);
   const request = useRef(false);
   const revision = useRef(0);
@@ -38,8 +39,8 @@ export function PhonePairingSettings({ api, canPair }: { api: Api; canPair: bool
   const pairing = canPair ? value.pairing : undefined;
   return <section aria-busy={busy}>
     <h2>Paired phones</h2>
-    <p className="note">Scan the QR from another screen, or open the setup link on the device you want to connect. Compare the code and approve on this host. Your phone saves a passkey for future unlocks with its screen lock. Open invitations within two minutes. After opening, you have ten minutes to approve and save the passkey.</p>
-    {error && <p role="alert">{error}</p>}
+    <details className="settings-help"><summary>Connection help</summary><p className="note">Scan the QR from another screen, or open the setup link on the device you want to connect. Compare the code and approve on this host. Your phone saves a passkey for future unlocks with its screen lock. Open invitations within two minutes. After opening, you have ten minutes to approve and save the passkey.</p></details>
+    {error && <Notice text={error} />}
     {!canPair && <p className="note">Enable and verify the private route before connecting another phone. You can still remove paired phones here.</p>}
     {!pairing && <button type="button" disabled={busy || !canPair || value.devices.length >= 8} onClick={() => void change("connect")}>Connect phone</button>}
     {pairing && <div className="settings-group">

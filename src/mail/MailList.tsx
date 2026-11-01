@@ -1,4 +1,4 @@
-import { useContext, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
+import { useCallback, useContext, type KeyboardEvent, type MouseEvent, type RefObject, type ReactNode } from "react";
 import type { Account, RendererMail as Mail } from "../../shared/types";
 import { previewText } from "../../shared/mail-content";
 import type { InteractionPreferences } from "../interaction";
@@ -12,6 +12,7 @@ import { Avatar } from "./Avatar";
 import { relative, shortLabel } from "./format";
 import { BulkSelectionContext, selectionKey } from "./bulk-selection";
 import { accountLabel } from "../mail-ui";
+import { useSwipe } from "../ui/useSwipe";
 
 type RowLayout = "inline" | "card";
 type RowAction = Omit<MenuAction, "run"> & { run: (event: MouseEvent<HTMLButtonElement>) => void };
@@ -19,10 +20,23 @@ type RowAction = Omit<MenuAction, "run"> & { run: (event: MouseEvent<HTMLButtonE
 const rowIcons = { archive: Archive, inbox: Inbox, snooze: Clock, unsnooze: Inbox, trash: Trash, reply: Reply, read: Check, unread: MailIcon, pin: Pin };
 const rowOrder = Object.keys(rowIcons);
 
+function MailGestureRow({ mail, enabled, onSwipe, children }: {
+  mail: Mail; enabled: boolean; onSwipe?: (direction: "left" | "right") => void; children: ReactNode;
+}) {
+  const bulk = useContext(BulkSelectionContext);
+  const ref = useSwipe(direction => {
+    if (!bulk?.selected.size) onSwipe?.(direction);
+  }, enabled && !bulk?.disabled, bulk ? () => bulk.toggle(mail, false) : undefined);
+  return <div ref={ref} data-mail-gestures={enabled ? "" : undefined}
+    className={`mail-row${bulk?.selected.has(selectionKey(mail)) ? " bulk-selected" : ""}`}>
+    {children}
+  </div>;
+}
+
 /**
- * Mail rows under sticky date headings. Wide lists keep sender and subject on
- * one uniform-height line; beside the reader the list is narrow, so each row
- * becomes a card: sender and time, the subject, then a preview in comfortable
+ * Mail rows under sticky date headings. Comfortable lists use the rebuild
+ * cards at every width. Compact wide lists retain one-line rows; beside the
+ * reader both densities use cards: sender and time, the subject, then a preview in comfortable
  * density. High-relevance mail carries an importance marker inside the sender
  * column. Direct actions share the message menu's handlers and guards; More
  * actions, right-click and the menu key retain the full menu.
@@ -30,6 +44,7 @@ const rowOrder = Object.keys(rowIcons);
 export function MailList<T extends Mail>({
   messages, selectedId, density, narrow, sort, opening, accounts, listRef, focusSelection,
   onOpen, onSelect, onMenu, onMenuKey, actions, showAccount = accounts.length > 1,
+  mailGestures = false, onSwipe,
 }: {
   messages: T[];
   listRef: RefObject<HTMLElement | null>;
@@ -46,15 +61,22 @@ export function MailList<T extends Mail>({
   onMenu: (event: MouseEvent<HTMLElement>, mail: T) => void;
   onMenuKey: (event: KeyboardEvent<HTMLElement>, mail: T) => void;
   actions?: (mail: T) => RowAction[];
+  mailGestures?: boolean;
+  onSwipe?: (mail: T, direction: "left" | "right") => void;
 }) {
+  const cardLayout = narrow || density === "comfortable";
+  const cardContent = useCallback((mail: T) => ({
+    metadata: showAccount || !!(mail.relevance === 3 && mail.reason),
+    preview: density === "comfortable" && !!previewText(mail.preview).trim(),
+  }), [showAccount, density]);
   const bulk = useContext(BulkSelectionContext);
   const { on: privacy } = useContext(PrivacyContext);
   return <>
-    {showAccount && !narrow && <div className="mail-list-columns" aria-hidden="true"><span>Account</span><span>Status</span></div>}
+    {showAccount && !cardLayout && <div className="mail-list-columns" aria-hidden="true"><span>Account</span><span>Status</span></div>}
     <MailListWindow messages={messages} selectedId={selectedId} focusSelection={focusSelection}
-    density={density} sort={sort} listRef={listRef} narrow={narrow}>{(m, index) => {
+    density={density} sort={sort} listRef={listRef} narrow={cardLayout} cardContent={cardContent}>{(m, index) => {
     const relevance = m.relevance;
-    const layout: RowLayout = narrow ? "card" : "inline";
+    const layout: RowLayout = cardLayout ? "card" : "inline";
     const current = m.id === selectedId;
     const accountIndex = accounts.findIndex((account) => account.id === m.accountId);
     const accountName = accountIndex < 0 ? "Account unavailable" : accountLabel(accounts[accountIndex], accountIndex, privacy, accounts);
@@ -77,7 +99,7 @@ export function MailList<T extends Mail>({
     const time = <time>{relative(m.date)}</time>;
     return (
       <MailPrivacy key={m.id} mail={m}>
-        <div className={`mail-row${bulk?.selected.has(selectionKey(m)) ? " bulk-selected" : ""}`}>
+        <MailGestureRow mail={m} enabled={mailGestures} onSwipe={direction => onSwipe?.(m, direction)}>
           {bulk && <button type="button" role="checkbox" className="mail-select"
             aria-label={`Select message ${index + 1}`} aria-checked={bulk.selected.has(selectionKey(m))}
             disabled={bulk.disabled} onClick={event => bulk.toggle(m, event.shiftKey)}>
@@ -109,7 +131,7 @@ export function MailList<T extends Mail>({
                 </span>
                 {metadata}
                 <span className="row-subject"><Redact text={m.subject || "(no subject)"} /></span>
-                {density === "comfortable" && (
+                {cardContent(m).preview && (
                   <span className="row-preview"><Redact text={previewText(m.preview)} /></span>
                 )}
               </span>
@@ -154,7 +176,7 @@ export function MailList<T extends Mail>({
               <More size={16} />
             </button>
           </div>
-        </div>
+        </MailGestureRow>
       </MailPrivacy>
     );
   }}</MailListWindow></>;

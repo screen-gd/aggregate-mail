@@ -1,9 +1,11 @@
 import { useContext, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { PrivacyContext } from "../ui/Privacy";
 import { commandsChord } from "../interaction";
-import { Close, Search } from "../ui/icons";
+import { Close, Info, Search } from "../ui/icons";
 
-export function SearchToolbar({ inputRef, query, label, invalid, disabled, commandsDisabled = disabled, shortcut, onFocus, onChange, onClear, onCommands, onSaveView, scopeKey = "" }: {
+export function SearchToolbar({ inputRef, query, label, invalid, disabled, commandsDisabled = disabled, shortcut, onFocus, onChange, onClear, onCommands, onSaveView, optionsOpen, onOptions, scopeKey = "" }: {
+  optionsOpen?: boolean;
+  onOptions?: () => void;
   inputRef: RefObject<HTMLInputElement | null>;
   query: string;
   scopeKey?: string;
@@ -37,7 +39,7 @@ export function SearchToolbar({ inputRef, query, label, invalid, disabled, comma
   return <div className="app-search-toolbar">
     <div className="search" role="search">
       <Search color="currentColor" size={15} />
-      <input data-compose-access ref={inputRef} aria-label={label} aria-describedby="mail-search-help" aria-invalid={invalid || undefined} placeholder={privacy && text && !focused ? "Hidden search. Focus to edit." : "Search mail and drafts"} value={privacy && !focused ? "" : text} disabled={disabled}
+      <input data-compose-access ref={inputRef} aria-label={label} aria-describedby="mail-search-help" aria-invalid={invalid || undefined} placeholder={privacy && text && !focused ? "Hidden search. Focus to edit." : "Search all mail"} value={privacy && !focused ? "" : text} disabled={disabled}
         onFocus={() => { setFocused(true); onFocus(); }} onBlur={() => setFocused(false)} onChange={(event) => change(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Escape") { event.stopPropagation(); clear(); event.currentTarget.blur(); }
@@ -46,6 +48,7 @@ export function SearchToolbar({ inputRef, query, label, invalid, disabled, comma
         <Close color="currentColor" size={13} />
       </button> : <kbd aria-hidden="true">{shortcut}</kbd>}
     </div>
+    {onOptions && <button type="button" className="icon" aria-label="Search options" title="Search options" aria-expanded={optionsOpen} aria-controls={optionsOpen ? "search-options" : undefined} disabled={disabled} onClick={onOptions}><Info size={15} /></button>}
     {onSaveView && <button data-compose-access type="button" className="save-view-button" disabled={disabled || text !== query} onClick={onSaveView}>Save view</button>}
     <button data-compose-access type="button" className="commands-button" disabled={commandsDisabled} onClick={onCommands}
       aria-haspopup="dialog" title={`Commands (${commandsChord()})`}>Commands <kbd>{commandsChord()}</kbd></button>

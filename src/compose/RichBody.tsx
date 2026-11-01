@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useLayoutEffect, useRef, useState } from "react";
 import { composeLink, composeMarkup, plainComposeHtml } from "../../shared/compose-content";
 import type { Compose } from "./draft-session";
@@ -17,7 +18,7 @@ export function RichBody({ draft, disabled, onChange }: { draft: Compose; disabl
   const emitted = useRef<string | undefined>(undefined);
   const pending = useRef<{ command: Command; value?: string; start: number; end: number } | undefined>(undefined);
   const selection = useRef<Range | undefined>(undefined);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const [link, setLink] = useState<string | null>(null);
   const linkSelection = useRef({ start: 0, end: 0 });
   const cancelLink = () => { setLink(null); setError(""); (editor.current || plain.current)?.focus(); };
@@ -142,6 +143,6 @@ export function RichBody({ draft, disabled, onChange }: { draft: Compose; disabl
         }}
         onDrop={event => event.preventDefault()}
         onKeyDown={shortcut} />}
-    {error && <p className="compose-format-error" role="alert">{error}</p>}
+    {error && <Notice text={error} />}
   </>;
 }

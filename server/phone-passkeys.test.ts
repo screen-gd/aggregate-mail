@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import { once } from "node:events";
-import { request } from "node:http";
+import { request, type IncomingHttpHeaders } from "node:http";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import express from "express";
 import QRCode from "qrcode";
 import { verifyAuthenticationResponse, verifyRegistrationResponse } from "@simplewebauthn/server";
@@ -30,9 +33,9 @@ async function fixture(t: TestContext, verifiers: Partial<Pick<Parameters<typeof
   app.get("/api/synthetic", (_req, res) => res.json({ ok: true }));
   const server = app.listen(0, "127.0.0.1"); await once(server, "listening");
   const address = server.address(); assert.ok(address && typeof address !== "string");
-  const call = (route: string, origin = remote, cookie = "", body?: unknown, extra: Record<string, string> = {}) => new Promise<{ status: number; body: any; cookies: string[] }>((resolve, reject) => {
+  const call = (route: string, origin = remote, cookie = "", body?: unknown, extra: Record<string, string> = {}) => new Promise<{ status: number; body: any; cookies: string[]; headers: IncomingHttpHeaders }>((resolve, reject) => {
     const req = request({ hostname: "127.0.0.1", port: address.port, path: route, method: body === undefined ? "GET" : "POST", headers: { Host: new URL(origin).host, Origin: origin, Cookie: cookie, "Content-Type": "application/json", "X-CSRF-Token": "synthetic-csrf", ...extra } }, (res) => {
-      let data = ""; res.on("data", (chunk) => { data += chunk; }); res.on("end", () => { let parsed: any = data; try { parsed = JSON.parse(data); } catch {} resolve({ status: res.statusCode!, body: parsed, cookies: res.headers["set-cookie"] || [] }); });
+      let data = ""; res.on("data", (chunk) => { data += chunk; }); res.on("end", () => { let parsed: any = data; try { parsed = JSON.parse(data); } catch {} resolve({ status: res.statusCode!, body: parsed, cookies: res.headers["set-cookie"] || [], headers: res.headers }); });
     }); req.on("error", reject); req.end(body === undefined ? undefined : JSON.stringify(body));
   });
   const login = await new Promise<string>((resolve, reject) => {
@@ -50,6 +53,32 @@ async function fixture(t: TestContext, verifiers: Partial<Pick<Parameters<typeof
   t.after(async () => { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); });
   return { call, host, connect, gate, credentials, login, advance: (ms: number) => { time += ms; } };
 }
+test("phone access pages load the public passkey client from a hidden installation directory", async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), "emc2-phone-assets-"));
+  const assets = path.join(directory, ".private-install", "dist");
+  await mkdir(assets, { recursive: true });
+  const client = "globalThis.syntheticPasskeyClient = true;";
+  await writeFile(path.join(assets, "auth-passkey.js"), client);
+  await writeFile(path.join(assets, ".hidden.js"), "synthetic-private-file");
+  const previous = process.env.MAIL_STATIC_DIR;
+  process.env.MAIL_STATIC_DIR = assets;
+  t.after(async () => {
+    if (previous === undefined) delete process.env.MAIL_STATIC_DIR;
+    else process.env.MAIL_STATIC_DIR = previous;
+    await rm(directory, { recursive: true, force: true });
+  });
+  const f = await fixture(t);
+  for (const route of ["/auth", "/auth/pair"])
+    assert.match((await f.call(route)).body, /src="\/auth\/passkey\.js"/);
+  const script = await f.call("/auth/passkey.js");
+  assert.equal(script.status, 200);
+  assert.match(script.headers["content-type"] || "", /(?:application|text)\/javascript/);
+  assert.equal(script.body, client);
+  assert.deepEqual(script.cookies, []);
+  assert.equal((await f.call("/api/synthetic")).status, 401);
+  assert.equal((await f.call("/auth/passkey.js", remote, "", undefined, { Host: "foreign.example.test" })).status, 403);
+  assert.doesNotMatch((await f.call("/auth/.hidden.js")).body, /synthetic-private-file/);
+});
 function authenticator() {
   const keys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
   const jwk = keys.publicKey.export({ format: "jwk" });
@@ -221,4 +250,55 @@ test("phone-initiated setup still requires matching localhost approval and verif
   const result = await f.call("/auth/passkey/register/verify", remote, cookie, auth.registration(options.body.challenge));
   assert.equal(result.status, 200);
   assert.equal((await f.call("/api/synthetic", remote, getCookie(result,"__Host-emc2_browser_session"))).status, 200);
+});
+
+
+test("headless setup links authorize only their first claim and still require verified WebAuthn", async (t) => {
+  const f = await fixture(t);
+  assert.equal((await f.call('/api/phone-devices/setup-link', local, '', {confirm: true})).status, 401);
+  assert.equal((await f.host('setup-link', {confirm: true}, {'X-CSRF-Token': ''})).status, 403);
+  assert.equal((await f.host('setup-link', {})).status, 400);
+  const invitation = await f.host('setup-link', {confirm: true});
+  assert.equal(invitation.status, 200);
+  const token = new URL(invitation.body.pairing.url).hash.slice(1);
+  const claimed = await f.call('/auth/passkey/pair', remote, '', {token});
+  assert.equal(claimed.body.approved, true);
+  const cookie = getCookie(claimed, '__Host-emc2_pair');
+  assert.equal((await f.call('/auth/passkey/pair', remote, '', {token})).status, 400);
+  assert.equal((await f.call('/api/synthetic', remote, cookie)).status, 401);
+  assert.equal((await f.call('/auth/passkey/register/options', remote, '', {})).status, 400);
+  const options = await f.call('/auth/passkey/register/options', remote, cookie, {});
+  const auth = authenticator();
+  const result = await f.call('/auth/passkey/register/verify', remote, cookie, auth.registration(options.body.challenge));
+  assert.equal(result.status, 200);
+  assert.equal((await f.call('/api/synthetic', remote, getCookie(result, '__Host-emc2_browser_session'))).status, 200);
+  assert.equal((await f.call('/api/phone-devices/setup-link', remote, getCookie(result, '__Host-emc2_browser_session'), {confirm: true})).status, 403);
+});
+
+test("setup authorization cannot be requested by a phone or survive expiry, cancellation or route loss", async (t) => {
+  const f = await fixture(t);
+  const setup = async () => {
+    const result = await f.host('setup-link', {confirm: true}); assert.equal(result.status, 200);
+    return {id: result.body.pairing.id, token: new URL(result.body.pairing.url).hash.slice(1)};
+  };
+  for (const mode of ['expiry', 'cancel', 'route']) {
+    const invitation = await setup();
+    if (mode === 'expiry') f.advance(120_001);
+    if (mode === 'cancel') await f.host('cancel', {confirm: true, id: invitation.id});
+    if (mode === 'route') { f.gate.setTailnetOrigin(undefined); f.gate.setTailnetOrigin(remote, 10_000_000); }
+    assert.equal((await f.call('/auth/passkey/pair', remote, '', {token: invitation.token})).status, 400, mode);
+  }
+  const invite = await f.connect();
+  const claimed = await f.call('/auth/passkey/pair', remote, '', {token: invite.token, approvedOnClaim: true, approved: true});
+  assert.equal(claimed.body.approved, false);
+  await f.host('cancel', {confirm: true, id: invite.id});
+  const request = await f.call('/auth/passkey/request', remote, '', {approvedOnClaim: true});
+  assert.equal(request.body.approved, false);
+  await f.host('cancel', {confirm: true, id: (await f.host()).body.pairing.id});
+  const next = await setup();
+  const result = await f.call('/auth/passkey/pair', remote, '', {token: next.token});
+  const cookie = getCookie(result, '__Host-emc2_pair');
+  f.advance(600_001);
+  assert.equal((await f.call('/auth/passkey/register/options', remote, cookie, {})).status, 400);
+  assert.equal(f.credentials.size, 0);
 });

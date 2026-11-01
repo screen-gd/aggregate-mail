@@ -81,7 +81,7 @@ export function Calendar({ items, messages = [], events = [], now, selectedEvent
         {onNewEvent && <button type="button" className="button" onClick={() => onNewEvent(day.startsWith(month) ? day : `${month}-01`)}>New event</button>}</div>
     </div>
     {view === "day" || view === "week" ? <>
-      <p className="work-meta">Device local time. Spans show elapsed duration; follow-ups and snoozes are points. Open entries below the schedule.</p>
+      <p className="work-meta">Local time</p>
       <div className="calendar-schedule" role="region" aria-label={`${view === "week" ? "Week" : "Day"} schedule`} tabIndex={0}>
         <div className={`calendar-schedule-columns calendar-columns-${view}`}>
           {scheduleDays.map(value => {
@@ -117,13 +117,12 @@ export function Calendar({ items, messages = [], events = [], now, selectedEvent
           const dayEntries = entries.filter((entry) => entry.day === value);
           const meetings = dayEntries.filter((entry) => entry.kind === "Event");
           const count = dayEntries.length;
-          // The visible chips repeat the day list below; the button's label carries the count.
+          // One preview keeps the month compact; the day list contains every entry.
           return <button type="button" key={value} aria-label={`${value}, ${count} scheduled`} aria-pressed={day === value} aria-current={value === today ? "date" : undefined} onClick={() => setDay(value)}>
-            <span>{index + 1}</span>
-            {meetings.length > 0 && <span className="calendar-chips" aria-hidden="true">{meetings.slice(0, 2).map((entry) => <span className="calendar-chip" key={entry.item.id}>
-              {entry.item.allDay ? "" : `${shortTime(Date.parse(entry.item.start))} `}{privacy ? entry.item.workSession ? "Work session" : "Event" : `${entry.item.workSession ? "Work session: " : ""}${entry.item.title}`}</span>)}
-              {meetings.length > 2 && <span className="calendar-chip more">+{meetings.length - 2} more</span>}</span>}
-            {count > meetings.length && <small>{meetings.length ? "+" : ""}{count - meetings.length}<span className="calendar-count-label"> scheduled</span></small>}
+            <span className="calendar-day-heading"><span>{index + 1}</span>{count > 0 && <small aria-hidden="true">{count}</small>}</span>
+            {meetings.length > 0 && <span className="calendar-chips" aria-hidden="true">{meetings.slice(0, 1).map((entry) => <span className="calendar-chip" key={entry.item.id}>
+              {privacy ? entry.item.workSession ? "Work session" : "Event" : entry.item.title}</span>)}
+            </span>}
           </button>;
         })}
       </div>

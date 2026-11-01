@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useContext, useRef, useState } from "react";
 import type { Category, RendererMail as Mail, Rule, RuleCondition } from "../../shared/types";
 import type { RulePreview } from "../../shared/workspace";
@@ -19,7 +20,7 @@ export function TeachDialog({ mail, busy, api, onClose, onSave }: {
   const [applyExisting, setApplyExisting] = useState(false);
   const [preview, setPreview] = useState<RulePreview | undefined>();
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const previewVersion = useRef(0);
   const { on: privacy } = useContext(PrivacyContext);
   const condition: RuleCondition | undefined = field === "sender" ? undefined : field === "hasAttachment" || field === "directQuestion" ? { field } : { field, contains };
@@ -37,7 +38,7 @@ export function TeachDialog({ mail, busy, api, onClose, onSave }: {
       <label><input type="checkbox" checked={applyExisting} onChange={(event)=>{setApplyExisting(event.target.checked);invalidate();}}/>Apply to matching existing cached messages too</label>
       <p>Unchecked means future messages only. Existing mail stays excluded from this rule.</p>
       <button type="button" className="button" disabled={busy||pending||["subject","body","recipient"].includes(field)&&!contains.trim()} onClick={async()=>{const version=++previewVersion.current;setPending(true);setError("");try{const result=await api<RulePreview>("/rules/preview","POST",input);if(version===previewVersion.current)setPreview(result);}catch{if(version===previewVersion.current)setError("Preview could not be confirmed. Try again before applying.");}finally{setPending(false);}}}>Preview compiled rule</button>
-      {error&&<p role="alert">{error}</p>}
+      {error&&<Notice text={error} />}
       {preview&&<section aria-label="Compiled rule preview"><h3>Compiled rule</h3><p>Exact sender in this account; {field === "sender"?"no extra condition":field === "hasAttachment"?"attachment metadata exists":field === "directQuestion"?"question mark in subject or cached body":<><Redact text={field}/> contains <Redact text={contains}/></>}. Category: {category}; relevance: {relevance}.</p><p>{preview.count} cached match(es). {applyExisting?"These existing matches will be updated.":"Existing matches are excluded; future messages only."}</p><ul>{preview.examples.map((example,index)=><li key={example.id}>{privacy?`Example ${index+1}`:<Redact text={example.subject}/>} · <Redact text={example.reason}/></li>)}</ul><p>Preview digest: <code>{preview.digest}</code></p></section>}
       <div className="form-actions"><span>Rules take priority over AI. Review the compiled preview before applying.</span><button className="button" disabled={busy||pending||!preview}>Apply reviewed rule <Check size={12}/></button></div>
     </form></MailPrivacy></Dialog>;
