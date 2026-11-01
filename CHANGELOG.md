@@ -6,7 +6,15 @@ unversioned history without treating it as a release record.
 
 ## Unreleased
 
+### Fixed
+
+- Render desktop and browser icons from vector artwork at each size, smoothing jagged logo edges and keeping Windows installer icons sharp across display sizes.
+
 ### Changed
+
+- Introduce Emc² with coloured brand artwork, a short product overview and a compact installation guide in the README. Detailed instructions now live in topic guides for accounts, daily mail, browser access, AI, backups and development.
+- Use the brand logo across the website header, footer and inbox demo, with matching website icons.
+- Open the Commands dialog instantly, collapse the sidebar on the documented spring curve, and remove unused entrance animations.
 
 - Add the Emc² brand mark as `public/favicon.png`. ([#195](https://github.com/collection-of-things/aggregate-mail/pull/195))
 
