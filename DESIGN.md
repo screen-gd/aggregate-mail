@@ -36,10 +36,12 @@ rounded:
 ## Application layout
 
 The app uses a 200px source rail, one view name in the persistent toolbar and
-separate working columns. Mail views share one 44px rail above the list: a
-select-all checkbox aligned with the row checkboxes, Inbox category tabs, and,
-while messages are selected, the bulk count and triage actions. Drafts account
-tabs sit directly below that toolbar. Other views show secondary bars only for
+separate working columns. Mail views share a rail with a 44px minimum height
+above the list: a select-all checkbox aligned with the row checkboxes, Inbox
+category tabs, and,
+while messages are selected, the bulk count and triage actions. The selected
+count and actions wrap to the available width. Sent-only selections show Pin,
+Unpin and Move to Trash. Drafts account tabs sit directly below that toolbar. Other views show secondary bars only for
 actions or cache controls. Work headings remain available to assistive
 technology, and Settings retains its distinct section titles.
 The reader keeps the subject and sender above the body, with secondary label,
@@ -97,7 +99,8 @@ column, and Inbox categories use a native picker with unread counts. Below 760px
 list edges use 8px padding and avatars use 24px with an 8px text gap.
 Background message refreshes preserve the current scroll position. Explicit
 metadata, density and text-size changes keep the selected message in view.
-The bulk count scrolls with its actions so long status text cannot cover them.
+Checkboxes align with the vertical center of both cards and inline rows.
+Bulk counts, sync waits and actions wrap without horizontal scrolling.
 The selected card uses a white document in light mode and a raised surface with
 a visible ring in dark mode. Sticky date headings cover the cards beneath them
 when glass is off. Reader subjects use 20px text; the supported mail body keeps
@@ -113,6 +116,17 @@ fields and document surfaces. The current components retain all operations,
 recovery, search, rich composition, attachments, browser protection and update
 status. Saved themes and glass remain available. Responsive rules load last
 and retain touch targets, safe areas, focus, reduced motion and keyboard access.
+
+Inbox tabs show the active category name; inactive tabs retain their icon and
+unread count, with full names available to assistive technology and tooltips.
+The narrow native picker retains every full category name.
+
+Appearance offers three full-width reader toolbars: One compact row combines
+categories and action icons, Actions only returns categories when the reader
+closes, and Two rows keeps categories above the actions. One compact row is the
+default. Each choice wraps when needed and applies to narrow reading as well.
+Side-by-side reading retains its separate reader header. The choice is saved
+per browser or installed app. See [ADR 0114](docs/adr/0114-reader-toolbar-preference.md).
 
 ## Brand assets
 
@@ -172,8 +186,7 @@ across the working area. Each column scrolls independently, with readable
 14px original-message text and a keyboard-focusable preview. Save status shares
 the action row beside Send, with recovery actions
 visible on failure. Scrollbar indicators stay hidden in every scrolling
-region except the bulk-selection rail, which keeps a thin bar while it
-overflows; wheel, trackpad and keyboard scrolling remain available.
+region; wheel, trackpad and keyboard scrolling remain available.
 
 ## Direction
 

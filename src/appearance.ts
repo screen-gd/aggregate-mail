@@ -41,6 +41,13 @@ export const readingLayouts = [
   { id: "full", label: "Full width" },
 ] as const;
 
+export const readerToolbars = [
+  { id: "compact", label: "One compact row" },
+  { id: "actions", label: "Actions only" },
+  { id: "separate", label: "Two rows" },
+] as const;
+
+export type ReaderToolbar = (typeof readerToolbars)[number]["id"];
 export type Mode = (typeof modes)[number]["id"];
 export type Scheme = "light" | "dark";
 export type ThemeId = (typeof themes)[number]["id"] | CustomTheme["id"];
@@ -55,10 +62,11 @@ export type Appearance = {
   transparency: Transparency;
   glassOpacity: number;
   reading: ReadingLayout;
+  readerToolbar: ReaderToolbar;
   customThemes: CustomTheme[];
 };
 
-export const defaultAppearance: Appearance = { mode: "dark", theme: "black", accent: "blue", transparency: "glass", glassOpacity: 70, reading: "split", customThemes: [] };
+export const defaultAppearance: Appearance = { mode: "dark", theme: "black", accent: "blue", transparency: "glass", glassOpacity: 70, reading: "split", readerToolbar: "compact", customThemes: [] };
 const storageKey = "emc2.appearance.v1";
 const glassOpacitySchema = z.number().int().min(0).max(100);
 
@@ -113,6 +121,7 @@ export function readAppearance(): Appearance {
       transparency,
       glassOpacity: glassOpacitySchema.safeParse(input.glassOpacity).data ?? defaultAppearance.glassOpacity,
       reading: oneOf(readingLayouts, input.reading) ? input.reading : defaultAppearance.reading,
+      readerToolbar: oneOf(readerToolbars, input.readerToolbar) ? input.readerToolbar : defaultAppearance.readerToolbar,
       customThemes: library,
     };
   } catch {
@@ -122,11 +131,12 @@ export function readAppearance(): Appearance {
 
 export function saveAppearance(value: Appearance): boolean {
   try {
-    const { mode, theme, accent, transparency, reading } = value;
+    const { mode, theme, accent, transparency, reading, readerToolbar } = value;
+    if (!oneOf(readerToolbars, readerToolbar)) return false;
     const glassOpacity = glassOpacitySchema.parse(value.glassOpacity);
     const library = customThemesSchema.parse(value.customThemes);
     if (!oneOf(themes, theme) && !library.some((custom) => custom.id === theme)) return false;
-    localStorage.setItem(storageKey, JSON.stringify({ mode, theme, accent, transparency, glassOpacity, reading, customThemes: library }));
+    localStorage.setItem(storageKey, JSON.stringify({ mode, theme, accent, transparency, glassOpacity, reading, readerToolbar, customThemes: library }));
     return true;
   } catch {
     return false;

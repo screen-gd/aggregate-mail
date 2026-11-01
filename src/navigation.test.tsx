@@ -3094,3 +3094,52 @@ test("selecting mail from an Inbox tab moves focus to the rail checkbox", async 
     assert.equal(app.window.document.activeElement, master, "focus leaves the hidden tabs for the master checkbox");
   } finally { await app.close(); }
 });
+
+for (const width of [360, 1440]) for (const readerToolbar of ["compact", "actions", "separate"] as const) {
+  test(`${readerToolbar} reader toolbar keeps one action set and restores categories at ${width}px`, async () => {
+    const app = await mount(false, (_state, storage) => storage.setItem("emc2.appearance.v1", JSON.stringify({ reading: "full", readerToolbar })), {}, [], width);
+    try {
+      await app.open("a:1");
+      const toolbar = app.container.querySelector('.mail-view .mail-actions')!;
+      assert.ok(toolbar);
+      assert.equal(app.container.querySelectorAll('.mail-view .mail-actions').length, 1);
+      assert.equal(!!toolbar.closest('.mail-category-bar'), readerToolbar !== "separate");
+      assert.equal(!!app.container.querySelector('.mail-category-bar :is(.inbox-tabs, .inbox-category-picker)'), readerToolbar !== "actions");
+      assert.equal(app.container.querySelector('.mail-view .rail-select'), null, "no empty selection gutter while reading");
+      for (const label of ["Move to Trash", "Reply", "Pin email", "Previous email", "Next email", "Close email"])
+        assert.ok(toolbar.querySelector(`[aria-label="${label}"]`), label);
+      await app.click(app.button("Next email"));
+      assert.equal(app.title(), "Beta");
+      await app.click(app.button("Close email"));
+      assert.ok(app.container.querySelector('.mail-category-bar :is(.inbox-tabs, .inbox-category-picker)'));
+      assert.ok(app.container.querySelector('.rail-select [role="checkbox"]'));
+      assert.equal(app.container.querySelector('.mail-view .mail-actions'), null);
+    } finally { await app.close(); }
+  });
+}
+
+test("Appearance changes the full-width toolbar immediately and preserves the choice after reopening", async () => {
+  const app = await mount(false, (_state, storage) => storage.setItem("emc2.appearance.v1", JSON.stringify({ reading: "full" })));
+  let saved = "";
+  try {
+    await app.open("a:1");
+    for (const [label, value] of [["Actions only", "actions"], ["Two rows", "separate"], ["One compact row", "compact"]]) {
+      await app.click(app.button("Settings"));
+      await app.click(app.button("Appearance"));
+      const group = app.container.querySelector('[aria-labelledby="reader-toolbar-label"]')!;
+      const choice = [...group.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === label)!;
+      await app.click(choice);
+      assert.equal(choice.getAttribute("aria-checked"), "true");
+      saved = app.storage.getItem("emc2.appearance.v1")!;
+      assert.equal(JSON.parse(saved).readerToolbar, value);
+      await app.click(app.button("Close settings"));
+      assert.equal(app.container.querySelector('.mail-view')?.getAttribute('data-reader-toolbar'), value);
+      assert.equal(app.title(), "Alpha", "changing layout preserves the opened message");
+    }
+  } finally { await app.close(); }
+  const reopened = await mount(false, (_state, storage) => storage.setItem("emc2.appearance.v1", saved));
+  try {
+    await reopened.open("a:1");
+    assert.ok(reopened.container.querySelector('.mail-view[data-reader-toolbar="compact"] .mail-category-bar .mail-actions'));
+  } finally { await reopened.close(); }
+});

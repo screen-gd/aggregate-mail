@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  accents, modes, readingLayouts, supportsGlass, themes, transparencyChoices,
+  accents, modes, readingLayouts, readerToolbars, supportsGlass, themes, transparencyChoices,
   type Appearance, type Scheme,
 } from "../appearance";
 import {
@@ -181,6 +181,16 @@ export function AppearanceSettings({ value, scheme, onChange, onPreview = noPrev
           <span id="reading-label">Reading pane</span>
           <Segmented labelledBy="reading-label" value={value.reading} choices={readingLayouts}
             onChange={(reading) => onChange({ ...value, reading })} />
+        </div>
+        <div className="settings-row stacked">
+          <span id="reader-toolbar-label">Full-width reader toolbar</span>
+          <Segmented labelledBy="reader-toolbar-label" value={value.readerToolbar} choices={readerToolbars}
+            onChange={(readerToolbar) => onChange({ ...value, readerToolbar })} />
+          <p className="note">{value.readerToolbar === "compact"
+            ? "Categories and action icons share a row, wrapping when space is limited."
+            : value.readerToolbar === "actions"
+              ? "Show mail actions while reading. Categories return when you close the email."
+              : "Keep categories above a separate row of mail actions."} Applies to full-width reading, including narrow windows.</p>
         </div>
         {onDensity && <div className="settings-row stacked">
           <span id="density-label">Density</span>

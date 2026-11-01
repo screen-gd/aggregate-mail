@@ -137,7 +137,7 @@
   min-width: 0;
   gap: 5px;
 }
-.workspace.split .inbox-tabs button:not(.active) .tab-label {
+.inbox-tabs button:not(.active) .tab-label {
   position: absolute;
   width: 1px;
   height: 1px;

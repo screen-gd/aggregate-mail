@@ -24,7 +24,7 @@ test("transparency picks the Windows material live and migrates the earlier on/o
   await withDesktop("win32", async (calls, dom) => {
     const { applyAppearance, defaultAppearance, readAppearance } = await import("./appearance");
     dom.window.localStorage.setItem("emc2.appearance.v1", JSON.stringify({ theme: "midnight", accent: "pink", glass: false }));
-    assert.deepEqual(readAppearance(), { mode: "dark", theme: "midnight", accent: "pink", transparency: "off", glassOpacity: 70, reading: "split", customThemes: [] });
+    assert.deepEqual(readAppearance(), { mode: "dark", theme: "midnight", accent: "pink", transparency: "off", glassOpacity: 70, reading: "split", readerToolbar: "compact", customThemes: [] });
     for (const transparency of ["glass", "subtle", "off"] as const)
       applyAppearance({ ...defaultAppearance, transparency });
     assert.deepEqual(calls.filter((call) => !call.startsWith("scheme:")), ["acrylic", "mica", "none"]);
@@ -165,5 +165,21 @@ test("an unavailable storage write leaves the saved theme library and selection 
     assert.equal(saveAppearance({ ...defaultAppearance, accent: "purple" }), false);
     assert.equal(dom.window.localStorage.getItem("emc2.appearance.v1"), saved);
     assert.equal(readAppearance().accent, "blue");
+  });
+});
+
+
+test("reader toolbar choices persist and older or invalid preferences use the compact layout", async () => {
+  await withDesktop("linux", async (_calls, dom) => {
+    const { readAppearance, saveAppearance, defaultAppearance } = await import("./appearance");
+    for (const readerToolbar of ["compact", "actions", "separate"] as const) {
+      assert.equal(saveAppearance({ ...defaultAppearance, readerToolbar }), true);
+      assert.equal(readAppearance().readerToolbar, readerToolbar);
+    }
+    for (const readerToolbar of [undefined, null, "unknown", 1]) {
+      dom.window.localStorage.setItem("emc2.appearance.v1", JSON.stringify({ reading: "full", readerToolbar }));
+      assert.equal(readAppearance().readerToolbar, "compact");
+      assert.equal(readAppearance().reading, "full");
+    }
   });
 });

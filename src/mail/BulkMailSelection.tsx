@@ -1,4 +1,4 @@
-import { useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Account, RendererMail } from "../../shared/types";
 import { MAX_MAIL_BATCH, type BulkMailAction, type MailBatchResponse, type MailBatchResult, type MailIdentity } from "../../shared/bulk-mail";
 import { createPortal } from "react-dom";
@@ -117,7 +117,6 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
     finally { lock.current = false; setPending(false); }
   };
   const sentOnly = items.length > 0 && items.every(item => available.get(selectionKey(item))?.direction === "sent");
-  const sentNote = useId();
   const label = (id: string) => {
     const index = accounts.findIndex(account => account.id === id);
     return index < 0 ? "Unavailable account" : accountLabel(accounts[index], index, privacy, accounts);
@@ -147,9 +146,7 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
     {!!items.length && <>
       <span className="rail-accounts">{[...new Set(items.map(item => item.accountId))].map(label).join(", ")}</span>
       <button className="tool" disabled={blocked} onClick={clear}>Clear selection</button>
-      {sentOnly && <span id={sentNote}>Sent mail supports Pin, Unpin and Move to Trash only.</span>}
-      <span className="rail-tools">{actions.map(([action, text], index) => <button key={index} className="tool" disabled={actionsBlocked || sentOnly && !sentActions.has(action)}
-        aria-describedby={sentOnly && !sentActions.has(action) ? sentNote : undefined} onClick={() => {
+      <span className="rail-tools">{actions.filter(([action]) => !sentOnly || sentActions.has(action)).map(([action, text], index) => <button key={index} className="tool" disabled={actionsBlocked} onClick={() => {
         if (action === "trash") setConfirmation(items.map(item => ({ ...item })));
         else if (action === "snooze") setSnoozing(true);
         else void execute(action);

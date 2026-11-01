@@ -1221,6 +1221,9 @@ export function App() {
       {privacy ? <EyeOff color="currentColor" size={15} /> : <Eye color="currentColor" size={15} />}
     </button>
   );
+  const fullReader = opened && !split;
+  const showInboxCategories = view === "inbox" && !query && !(fullReader && appearance.readerToolbar === "actions");
+  const combinedReaderToolbar = fullReader && appearance.readerToolbar !== "separate";
   const actions = selected && (
     <MailActions
       mail={selected}
@@ -1497,21 +1500,23 @@ export function App() {
               reader={selected && opened ? <div ref={readerRef} className="today-mail">{actions}{reader}</div> : undefined} />}
           </main>
         ) : (
-          <div className="mail-view" inert={!!compose}>
+          <div className={`mail-view${fullReader ? " full-reading" : ""}`} data-reader-toolbar={appearance.readerToolbar} inert={!!compose}>
               <h1 className="pane-title visually-hidden">{viewNames[view]}</h1>
               {(view === "sent" || view === "all") && <PaneHeader className="main-head mail-view-head" corner={null} maximized={maximized}>
                 <span className="view-summary">{loaded ? `${filtered.length} cached ${filtered.length === 1 ? "message" : "messages"}` : "Loading cached mail"}</span>
                 {(view === "sent" || view === "all") && <div className="head-note">Cached mail only. <button type="button" title={accountFilter === "all" ? "Select one account to fetch up to 50 Sent messages" : "Fetch up to 50 Sent messages"} disabled={busy || accountFilter === "all"} onClick={() => void perform(async () => { const coverage = await api<SentCoverage>(`/accounts/${encodeURIComponent(accountFilter)}/sent/sync`, "POST", { bound: 50 }); if (coverage.error) throw new Error("Sent import failed. Existing cached mail remains available."); }, "Sent cache refreshed.")}>Fetch Sent</button>{accountFilter === "all" && <small>Choose an account first.</small>}</div>}
               </PaneHeader>}
-              <div className="mail-category-bar">
-                <div className="rail-select" ref={setRailSelect} />
-                {view === "inbox" && !query && <InboxTabs tab={tab} unread={tabUnread} onTab={switchTab} compact={!splitRoom} />}
-                <div className="rail-actions" ref={setRailActions} />
-              </div>
+              {(!opened || showInboxCategories || combinedReaderToolbar) && <div className="mail-category-bar">
+                {!opened && <div className="rail-select" ref={setRailSelect} />}
+                {showInboxCategories &&
+                  <InboxTabs tab={tab} unread={tabUnread} onTab={switchTab} compact={!splitRoom} />}
+                {!opened && <div className="rail-actions" ref={setRailActions} />}
+                {combinedReaderToolbar && actions}
+              </div>}
           <main className={split ? "workspace split" : "workspace"}>
             <section className="list-pane">
               {!settings && <CredentialFallbackNotice mode={window.desktop?.credentialFallback} />}
-              {opened && !split && actions}
+              {fullReader && !combinedReaderToolbar && actions}
               <div
                 ref={listRef}
                 className={`list ${density}`}

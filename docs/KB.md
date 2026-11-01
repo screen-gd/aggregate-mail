@@ -312,6 +312,16 @@ the list column. Card
 heights and the list virtualizer share the tokens in `styles/tokens.css`;
 account metadata stays inside those measured rows.
 
+`emc2.appearance.v1.readerToolbar` saves `compact`, `actions` or `separate`.
+Missing or invalid values use `compact`. Settings > Appearance exposes all
+three full-width reader arrangements; narrow windows use the same preference.
+Only one `MailActions` instance renders for the opened message. Closing restores
+the category navigation and selection rail. Inactive category names remain
+accessible, while only the active name is visible on wide tab strips.
+Bulk selection grows with wrapped status and actions. Sent-only selections
+expose Pin, Unpin and Move to Trash, keeping confirmation and sync guards.
+Checkboxes stay vertically centered inside the stable 34px selection gutter.
+
 Today status navigation is local display state. Open groups are separated by
 deadline and waiting status; completed and cancelled work stays available.
 Projects keeps decisions in its context pane and preserves decision draft

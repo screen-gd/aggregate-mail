@@ -21,6 +21,8 @@ unversioned history without treating it as a release record.
 ### Changed
 
 - Use the closing brand image for website link previews, replacing the old inbox screenshot with the Emc² logo and “Email at the speed of light. Inbox, weightless.” ([#190](https://github.com/collection-of-things/aggregate-mail/pull/190))
+- Choose a full-width reader toolbar in Appearance: combine categories and action icons, show actions only, or keep two rows. The choice is saved and works in narrow windows too. Inactive Inbox tabs show their icon and unread count; the active tab keeps its full name. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
 - Use the full Emc² logo, including its symbol, in the sidebar and sign-in pages, with matching app icons for browser shortcuts and desktop icon formats. Light and dark logos follow the interface appearance. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 
 - Fit mail cards and notifications to their visible details, tighten Today, Projects, drafts and Settings spacing, and keep short confirmation messages and Undo together. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
@@ -34,6 +36,8 @@ unversioned history without treating it as a release record.
 - Give the marketing site light and dark themes. It follows the system setting until the visitor picks one with the header toggle, which is remembered. The dark theme is neutral black with white text, the demo inbox switches to the app's dark scheme, and each painting swaps to a public-domain night counterpart. ([#184](https://github.com/collection-of-things/aggregate-mail/pull/184))
 
 ### Fixed
+
+- Center selection checkboxes within mail cards and wrap bulk counts, sync waits and actions to keep every control reachable. Sent-only selections show only Pin, Unpin and Move to Trash. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 
 - Give phone and tablet mail the available reading width, keep every Inbox category reachable through a compact picker, and use readable cards in both density settings. Phone cards use smaller outer gaps without shifting text during selection. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 

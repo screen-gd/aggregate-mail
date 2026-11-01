@@ -273,11 +273,24 @@
 .rail-select { flex-shrink: 0; width: 16px; display: grid; place-items: center; }
 .rail-actions { display: flex; align-items: center; min-width: 0; margin-left: auto; }
 .rail-actions:has(> [data-selection="true"]) { flex: 1; margin-left: 0; }
+.mail-category-bar:has(.rail-actions [data-selection="true"]) { height: auto; min-height: 44px; padding-block: 6px; overflow: visible; }
+.mail-category-bar:has(.rail-actions [data-selection="true"]) .rail-select { align-self: flex-start; height: calc(16.675px * var(--text-scale, 1)); }
 .mail-category-bar:has(.rail-actions [data-selection="true"]) .inbox-tabs { display: none; }
 .mail-category-bar .inbox-tabs button { min-width: max-content; flex: none; font-size: calc(11px * var(--text-scale, 1)); }
 .mail-category-bar .tab-name { display: inline; }
 .mail-category-bar .tab-icon { display: none; }
 :root:not([data-glass]) .mail-category-bar { background: var(--surface); }
+/* Full-width reading reuses one set of actions in the chosen toolbar layout. */
+.full-reading .mail-category-bar { height: auto; min-height: 44px; flex-wrap: wrap; gap: 4px 12px; padding-block: 4px; overflow: visible; }
+.full-reading .mail-category-bar .inbox-tabs { height: 36px; }
+.full-reading .inbox-category-picker { flex-basis: 100%; }
+.full-reading .mail-category-bar > .mail-actions { flex: 1; padding: 0; border: 0; }
+.full-reading .inbox-tabs + .mail-actions { padding-left: 8px; border-left: 1px solid var(--line); }
+.full-reading .mail-actions { min-width: 0; }
+.full-reading .mail-actions .tool-group { min-width: 0; max-width: 100%; flex-shrink: 1; flex-wrap: wrap; }
+.full-reading[data-reader-toolbar="compact"] .mail-actions .tool-label { display: none; }
+.full-reading[data-reader-toolbar="compact"] .mail-actions .tool-group { display: contents; }
+.full-reading .mail-actions #trash-unavailable { flex-basis: 100%; white-space: normal; overflow-wrap: anywhere; }
 .reader-head { height: 43px; padding-inline: 20px; }
 .reader-head .mail-actions { gap: 10px; }
 .reader-scroll .message { padding: 29px var(--reader-gutter, 32px); }

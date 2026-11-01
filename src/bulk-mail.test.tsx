@@ -156,11 +156,9 @@ test("select-all over Sent mail offers only the actions Sent supports", async ()
     await ui.render(messages.slice(0, 3).map(mail => ({ ...mail, direction: "sent" as const })), "sent");
     await ui.key("local-0", "a", { ctrlKey: true });
     assert.match(ui.count()!, /^3 messages selected/);
-    assert.equal(ui.button("Mark as read").disabled, true);
-    assert.equal(ui.button("Archive").disabled, true);
+    assert.deepEqual([...document.querySelectorAll(".rail-tools button")].map(button => button.textContent), ["Pin", "Unpin", "Move to Trash"]);
     assert.equal(ui.button("Pin").disabled, false);
     assert.equal(ui.button("Move to Trash").disabled, false);
-    assert.match(document.getElementById(ui.button("Mark as read").getAttribute("aria-describedby")!)!.textContent!, /Sent mail supports Pin, Unpin and Move to Trash only/);
   } finally { await ui.close(); }
 });
 
