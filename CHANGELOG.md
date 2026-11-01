@@ -6,6 +6,10 @@ unversioned history without treating it as a release record.
 
 ## Unreleased
 
+### Changed
+
+- Add the Emc² brand mark as `public/favicon.png`. ([#195](https://github.com/collection-of-things/aggregate-mail/pull/195))
+
 ## 0.2.24 - 2026-11-01
 
 ### Security
