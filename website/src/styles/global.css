@@ -382,6 +382,13 @@ section {
   mask: url("/brand/emc2-mark.svg") center / contain no-repeat;
 }
 
+@media (forced-colors: active) {
+  .brand-lockup, .brand-symbol {
+    background-color: CanvasText;
+    forced-color-adjust: none;
+  }
+}
+
 .bar-mark {
   display: flex;
   align-items: center;

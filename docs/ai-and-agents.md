@@ -43,10 +43,11 @@ before anything is sent.
 
 ## MCP
 
-AI clients can read synced mail and reply through the running app at
+AI clients can read synced mail and prepare reply drafts through the running app at
 `http://127.0.0.1:32145/mcp`. The server uses MCP Streamable HTTP. It shares the
 app's encrypted store and provider operations; no separate database process is
-needed.
+needed. Approving a reply saves a local draft; only your own Send action in the
+composer delivers it.
 
 1. Open Settings, AI and agents and turn on Enable MCP. It is off by default.
 2. Open Agent review. Create a grant for the exact accounts and tools that client needs, then copy its credential. The legacy Settings token grants no account access.
@@ -87,6 +88,10 @@ For Claude Code:
 ```sh
 claude mcp add --transport http emc2 http://127.0.0.1:32145/mcp --header "Authorization: Bearer <token>"
 ```
+
+Replacing `<token>` with a real credential may store the bearer token in shell
+history. Remove that history entry afterward, or use the JSON configuration
+alternative below and keep that file private.
 
 For JSON-config clients that support Streamable HTTP `url` and `headers` entries,
 including compatible Claude Desktop/Cursor configurations:

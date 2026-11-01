@@ -9,14 +9,23 @@ encrypted workspace backup can restore.
 
 Mail, account credentials, rules and sync metadata are AES-256-GCM encrypted in
 the app-data folder's `mail` directory. The app-data folder is `%APPDATA%/Emc²` on
-Windows and `~/Library/Application Support/Emc²` on macOS. Renamed from Aggregate
-Mail in `0.1.4`.
+Windows, `~/Library/Application Support/Emc²` on macOS and
+`$XDG_CONFIG_HOME/Emc²` (normally `~/.config/Emc²`) on Linux. Renamed from
+Aggregate Mail in `0.1.4`.
 
 The first launch under the new name moves the `mail` directory, `settings.env` and
 `Local State` from the old app-data folder into the new one, leaves the old folder
 behind, and records `.renamed-to-emc2` so it never runs twice. Electron
-safeStorage protects the database key using Windows DPAPI or the macOS Keychain.
-The renderer is sandboxed and has no Node access.
+safeStorage protects the database key using Windows DPAPI, the macOS Keychain or
+an available Linux system keyring. The renderer is sandboxed and has no Node
+access.
+
+On Linux, when system encryption is unavailable, a fresh profile may store its
+database key in `mail/key.local` with mode `0600` and display a persistent
+weaker-protection warning. The database stays encrypted, but anyone who can read
+that key can decrypt it. An existing local-key profile keeps using that fallback;
+an existing `key.protected` is never replaced or bypassed. See
+[the Linux fallback decision](adr/0027-linux-local-key-fallback.md).
 
 Mail/configuration endpoints require a random desktop-session token, in addition
 to origin and CSRF checks.

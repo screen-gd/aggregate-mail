@@ -3550,8 +3550,9 @@ the shared geometry. See [ADR 0113](adr/0113-responsive-mail-layout.md).
 `build/icon.svg` and `build/mark.svg` are the vector sources for app, tray,
 browser and website icons. Run `npm run icons` after changing these sources;
 `npm run check:icons` checks that every generated file matches. Packaging
-commands run this check before building. The generator uses the pinned Sharp
-dev dependency and renders each size from SVG with supersampling, rather than
+commands run this check before building. Shared release steps also run it after
+the Linux tests and before building and packaging on each platform. The generator
+uses the pinned Sharp dev dependency and renders each size from SVG with supersampling, rather than
 resizing a low-resolution raster. Keep the SVG paths, colours and proportions
 intact. The repository avatar uses the same mark in Energy (`#A50685`).
 

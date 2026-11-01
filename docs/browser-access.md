@@ -9,7 +9,9 @@ private Tailscale route.
 
 The optional browser target uses the same mail interface without Electron. It
 requires Node 24.x and installed dependencies. Build once with `npm run
-build:web`, then run `npm run start:web` and open `http://127.0.0.1:3001`.
+build:web`, then run `npm run start:web` and open the configured `APP_URL`.
+The default is `http://127.0.0.1:3001`; `MAIL_WEB_PORT` changes the default port,
+and `APP_URL` can override the browser origin.
 
 This build does not package or compile Electron. The local service must remain
 running.
@@ -163,9 +165,11 @@ synced passkey may represent more than one physical device. Removing it revokes
 every session using that passkey.
 
 Privacy removes the URL, QR and comparison code from the Settings DOM and hides
-the approval action. Host route management and pairing require the signed-in
-localhost browser, exact Origin and CSRF. The desktop target does not configure
-browser hosting.
+the approval action. Web-initiated host route management and pairing require the
+signed-in localhost browser, exact Origin and CSRF. The separate headless
+`phone:link` flow carries approval for the invitation's first claim and still
+requires a verified passkey before inbox access. The desktop target does not
+configure browser hosting.
 
 Keep Emc² and Tailscale running on the host.
 

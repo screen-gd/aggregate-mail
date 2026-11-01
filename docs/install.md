@@ -62,8 +62,8 @@ See [ADR 0080](adr/0080-macos-automatic-replacement.md).
 
 For a local source installation, build Emc² on the Mac that will run it. This
 route requires no Apple Developer account or signing certificate. Install
-[Node.js](https://nodejs.org/en/download) 24 or newer with npm, then install
-Apple's Command Line Tools if needed:
+[Node.js](https://nodejs.org/en/download) 24.22.1 or a newer 24.x release with npm,
+then install Apple's Command Line Tools if needed:
 
 ```sh
 xcode-select --install

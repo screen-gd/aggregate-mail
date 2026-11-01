@@ -21,10 +21,12 @@ Promotions, Newsletters, Transactions and Updates tabs. Gmail mail follows Gmail
 own categories; codes, security notices, support threads and replies always stay
 in Primary. Numbered account controls filter the view.
 
-Each sender shows its company logo, fetched once by the app from a favicon service
-and cached on this computer; senders on Gmail, Outlook, iCloud and similar hosts
-keep their initial, because their favicon would be the provider's logo rather than
-their own.
+Sender logos use the brand library first, with a third-party favicon service as
+fallback. The first uncached favicon lookup sends the sender's domain to that
+service, then caches the result on this computer. See [the security
+policy](../SECURITY.md#trust-boundaries). Senders on Gmail, Outlook, iCloud and
+similar hosts keep their initial, because their favicon would be the provider's
+logo rather than their own.
 
 ### Density and row layout
 

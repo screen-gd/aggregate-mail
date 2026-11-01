@@ -44,8 +44,9 @@ Snoozes and saved views stay local to this client.
 
 AI sorting is optional. When you enable it, the app sends the sender, subject
 and a short message preview to your configured AI provider. MCP access is off
-by default and requires explicit account and tool permissions. Sending needs
-its own permission. See [local storage](docs/storage-and-backups.md#local-storage),
+by default and requires explicit account and tool permissions. An approved
+`reply_to_email` request saves a local draft; only your own Send action in the
+composer delivers it. See [local storage](docs/storage-and-backups.md#local-storage),
 [AI sorting](docs/ai-and-agents.md#jev-sorting) and
 [MCP](docs/ai-and-agents.md#mcp) for the details.
 
