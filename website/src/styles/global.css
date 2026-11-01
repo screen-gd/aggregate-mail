@@ -928,8 +928,8 @@ html:not(.no-js) .art-i[loading="lazy"]:not(.ok) {
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: safe center;
+  justify-content: safe center;
   padding: 56px;
 }
 
@@ -970,8 +970,61 @@ html:not(.no-js) .art-i[loading="lazy"]:not(.ok) {
     padding: 16px;
   }
 
-  .feat-panel .appwin {
-    min-width: 560px;
+  /* the demo windows shrink to the panel: long single-line values
+     ellipsize instead of forcing a wider window than fits */
+  .feat-panel .compose-chip {
+    display: inline-block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* a block compose-v ellipsizes a long address where the flex version
+     clipped it mid-word; the chevron icon stays inline against the
+     global block-svg reset, and the tighter row padding helps the
+     footer with Send land inside the 420px panel */
+  .feat-panel .compose-v {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    padding: 9px 0;
+  }
+
+  .feat-panel .compose-v svg {
+    display: inline;
+    vertical-align: -2px;
+  }
+
+  .feat-panel .compose-tools {
+    min-height: 38px;
+  }
+
+  .feat-panel .compose-body {
+    margin-top: 6px;
+  }
+
+  .feat-panel .compose-sig {
+    margin-top: 8px;
+  }
+
+  .feat-panel .compose-foot {
+    margin-top: 10px;
+    padding-top: 8px;
+  }
+
+  /* teach-v is a flex box only for centring — a block gets the same
+     alignment through line-height and can ellipsize its value */
+  .feat-panel .teach-v {
+    display: block;
+    line-height: 30px;
+    text-overflow: ellipsis;
+  }
+
+  .feat-panel .teach-actions {
+    flex-wrap: wrap;
   }
 
   .feat-item-t {

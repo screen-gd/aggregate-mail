@@ -3,7 +3,9 @@
 // low-frequency wave drifts the light, fine film grain and a soft vignette
 // sit on top. The hero adds a slow domain-warped fractal tinted in the page
 // palette. No libraries; the canvas fades in over the painting's CSS
-// fallback once the first frame has drawn.
+// fallback once the first frame has drawn. The breathe runs only while a
+// fine-pointer screen wider than 760px asks for it — reduced motion,
+// touch and small windows keep that one still frame.
 
 /* v runs top-down to match the DOM image and the upload: the texture is
    written in image row order (ImageBitmap uploads ignore UNPACK_FLIP_Y
@@ -285,9 +287,9 @@ export function startPaintShader(
     gl = canvas.getContext("webgl", {
       antialias: false,
       alpha: false,
-      // keep the last frame in the buffer so compositor snapshots never see a
-      // cleared (black) canvas between a resize and the next rAF paint
-      preserveDrawingBuffer: true,
+      // a resize repaints in the same task, so compositor snapshots never
+      // see a cleared buffer even with the drawing buffer unpreserved
+      preserveDrawingBuffer: false,
     }) as WebGLRenderingContext | null;
   } catch {
     return state;
@@ -326,8 +328,8 @@ export function startPaintShader(
     return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
   };
 
-  /* render at <= 1.5 device pixels */
-  const dpr = () => Math.min(devicePixelRatio || 1, 1.5);
+  /* render at no more than one device pixel */
+  const dpr = () => Math.min(devicePixelRatio || 1, 1);
 
   const quad = ctx.createBuffer();
   ctx.bindBuffer(ctx.ARRAY_BUFFER, quad);
@@ -524,8 +526,12 @@ export function startPaintShader(
     }
   })();
 
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reduced) return state; // the still frame from onload is enough
+  /* the breathe is a fine-pointer, wide-screen detail: reduced motion,
+     touch and small screens keep the still frame from onload and run no
+     loop, and the loop starts or stops when a resize, input or motion
+     preference change crosses that line */
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  const breathe = matchMedia("(pointer: fine) and (min-width: 761px)");
 
   /* ~20fps while in view — the breathe is slow, and each draw also costs
      a masked re-composite of the painting layer; the rAF loop stops
@@ -541,7 +547,7 @@ export function startPaintShader(
     draw();
   };
   const sync = () => {
-    const run = inView && !document.hidden;
+    const run = !reduced.matches && breathe.matches && inView && !document.hidden;
     if (run && !raf) {
       lastFrame = 0;
       raf = requestAnimationFrame(loop);
@@ -555,6 +561,8 @@ export function startPaintShader(
     sync();
   }).observe(container);
   document.addEventListener("visibilitychange", sync);
+  breathe.addEventListener("change", sync);
+  reduced.addEventListener("change", sync);
   sync();
 
   return state;

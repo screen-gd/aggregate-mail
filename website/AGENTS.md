@@ -71,6 +71,10 @@ logic; keep it green when touching `src/lib`.
   panel rise, the live mail arrival, the slow painting drift, the fluted
   field's drift and scroll parallax, the card entrances and the
   auto-advancing command demo all settle to their final state under it.
+  The painting drift also runs only on fine-pointer screens wider than
+  760px, so touch and small screens get a single still frame while the
+  field keeps drifting; the shader canvases render at no more than one
+  device pixel and do not preserve their drawing buffers.
   Content is in the HTML on first paint; never hide content behind
   script.
 - Demo mail is synthetic. Never add real mail, credentials, private hostnames
