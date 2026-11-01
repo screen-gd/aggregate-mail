@@ -3114,6 +3114,16 @@ Workspace backups reject retained work without connected account identity hints.
 Preview and import each check deduplicated destination draft and template quotas
 inside the transaction; overflow imports leave existing work unchanged.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:ee68fb46b72ee71f39dec55925b62cd50abe73cc207e3338dd63a05d84da6463 -->
+
+Account-prefixed mail references use a compressed prefix tree so each reference
+is scanned once; overlapping account IDs retain their original listed order.
+The encrypted file cap bounds the total imported reference data.
+
+<!-- /coderabbit-ai-generated:v1 -->
+
 ## Practical attachment envelope
 
 Outgoing messages allow 20 attachments and 25 MiB of decoded file bytes in total,

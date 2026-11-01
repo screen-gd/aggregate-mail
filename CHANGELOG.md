@@ -8,6 +8,14 @@ unversioned history without treating it as a release record.
 
 ### Security
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:57934fcf57d15d7e0d17b87815188d9a2eee6fcfdc8678040301bf1fc823faa0 -->
+
+- Reduce backup preview delays caused by mail references containing many colons.
+
+<!-- /coderabbit-ai-generated:v1 -->
+
 - Bound mail formatting and IMAP search processing, reuse conversation work during agent review, and keep notification refreshes independent of message body size. ([#181](https://github.com/collection-of-things/aggregate-mail/pull/181))
 - Require confirmed IMAP identities for archived-message changes, encrypted remote sorting connections, and safe provider/credential pairing. ([#181](https://github.com/collection-of-things/aggregate-mail/pull/181))
 - Review unverified calendar changes against the existing event. Restored drafts must be prepared again before sending calendar data. PDFs remain available to download; in-app PDF preview is disabled until it has a memory bound. ([#181](https://github.com/collection-of-things/aggregate-mail/pull/181))

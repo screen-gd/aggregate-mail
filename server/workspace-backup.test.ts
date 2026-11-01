@@ -97,6 +97,52 @@ test("encrypted workspace backup and non-destructive restore, synthetic only", {
     assert.equal(store.get("proposal", "proposal")!.status, "pending", "existing history retained");
     assert.equal(store.all("draft").length, 1);
   });
+  await t.test("reference prefixes preserve account order across typed fields", () => {
+    const hints = [
+      { id: "s", email: "short@example.test", provider: "imap" as const },
+      { id: "s:l", email: "long@example.test", provider: "imap" as const },
+      { id: "s::", email: "colon@example.test", provider: "imap" as const },
+      { id: "😀", email: "unicode@example.test", provider: "imap" as const },
+    ];
+    for (const [index, hint] of hints.entries()) store.put("account", `mapped-${index}`, { ...synthetic, id: `mapped-${index}`, email: hint.email });
+    const longReference = `s:l:${":".repeat(1996)}`;
+    const sources = ["s:l:mail", "s:l", "s:::mail", "😀:mail", "other:mail", "s", longReference];
+    const original = (kind: string) => payload.records.find(row => row.kind === kind)!.value as Record<string, unknown>;
+    try {
+      for (const [iteration, accounts] of [hints, [hints[2], hints[1], hints[0], hints[3]]].entries()) {
+        const expected = sources.map(source => {
+          const hint = accounts.find(account => source.startsWith(`${account.id}:`));
+          return hint ? `mapped-${hints.indexOf(hint)}:${source.slice(hint.id.length + 1)}` : source;
+        });
+        const records = [
+          { kind: "project" as const, id: `prefix-project-${iteration}`, value: { ...original("project"), id: `prefix-project-${iteration}`, accountIds: ["s", "s:l"], sourceMailIds: sources } },
+          { kind: "commitment" as const, id: `prefix-commitment-${iteration}`, value: { ...original("commitment"), id: `prefix-commitment-${iteration}`, accountId: "s", sourceMailId: sources[0], evidenceMailIds: sources, history: [{ at: 1, status: "needs-reply", text: "Synthetic", reason: "Synthetic", evidenceMailIds: sources }] } },
+          { kind: "rule" as const, id: `prefix-rule-${iteration}`, value: { ...original("rule"), id: `prefix-rule-${iteration}`, accountId: "s", excludedMailIds: sources } },
+          { kind: "proposal" as const, id: `prefix-proposal-${iteration}`, value: { ...original("proposal"), id: `prefix-proposal-${iteration}`, accountId: "s", sourceMailId: sources[0], payload: { mailId: sources[0] } } },
+          { kind: "workspaceMailState" as const, id: `s:l:state-${iteration}`, value: { id: `s:l:state-${iteration}`, accountId: "s", snoozedUntil: 1 } },
+        ];
+        const incoming = { ...payload, accounts, records, manifest: { ...payload.manifest, counts: Object.fromEntries(Object.keys(payload.manifest.counts).map(kind => [kind, records.filter(row => row.kind === kind).length])) } };
+        assert.equal(backup.mergeBackup(incoming).missingAccounts, 0);
+        assert.equal(store.get("project", records[0].id), undefined);
+        backup.mergeBackup(incoming, true);
+        assert.deepEqual(store.get("project", records[0].id)!.sourceMailIds, expected);
+        const commitment = store.get("commitment", records[1].id)!;
+        assert.equal(commitment.sourceMailId, expected[0]);
+        assert.deepEqual(commitment.evidenceMailIds, expected);
+        assert.deepEqual(commitment.history[0].evidenceMailIds, expected);
+        assert.deepEqual(store.get("rule", records[2].id)!.excludedMailIds, expected);
+        const proposal = store.get("proposal", records[3].id)!;
+        assert.equal(proposal.sourceMailId, expected[0]);
+        assert.deepEqual(proposal.payload, { mailId: expected[0] });
+        const stateId = `${expected[0].slice(0, -"mail".length)}state-${iteration}`;
+        assert.ok(store.get("workspaceMailState", stateId));
+        for (const row of records.slice(0, 4)) store.remove(row.kind, row.id);
+        store.remove("workspaceMailState", stateId);
+      }
+    } finally {
+      for (const index of hints.keys()) store.remove("account", `mapped-${index}`);
+    }
+  });
   await t.test("account remapping, merged preferences and deferred flags", () => {
     for (const kind of ["commitment", "project", "decision", "draft", "rule", "proposal"] as const)
       for (const value of store.all(kind)) store.remove(kind, value.id);

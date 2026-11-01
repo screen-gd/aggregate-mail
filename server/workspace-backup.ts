@@ -156,15 +156,40 @@ function prepare(payload: Payload) {
     if (matches.length === 1) mapping.set(source.id, matches[0].id);
   }
   const accountId = (source: string) => mapping.get(source) ?? source;
-  // Account ids may contain ':'; the first listed account whose id prefixes the
-  // reference wins, matching the original sequential find. Colon positions keep
-  // each lookup to the few candidates a reference can name.
-  const accountIndexes = new Map(payload.accounts.map((source, index) => [source.id, index]));
+  // Compressed edges keep the tree bounded by the number of accounts, even for
+  // long IDs. Each reference is scanned once, including when IDs contain ':'.
+  type PrefixNode = { edge: string; children: Map<string, PrefixNode>; index?: number };
+  const root: PrefixNode = { edge: "", children: new Map() };
+  payload.accounts.forEach((account, index) => {
+    let node = root, offset = 0;
+    while (offset < account.id.length) {
+      const child = node.children.get(account.id[offset]);
+      if (!child) {
+        node.children.set(account.id[offset], { edge: account.id.slice(offset), children: new Map(), index });
+        return;
+      }
+      let common = 0;
+      while (common < child.edge.length && offset + common < account.id.length && child.edge[common] === account.id[offset + common]) common++;
+      if (common < child.edge.length) {
+        const branch: PrefixNode = { edge: child.edge.slice(0, common), children: new Map() };
+        child.edge = child.edge.slice(common);
+        branch.children.set(child.edge[0], child);
+        node.children.set(branch.edge[0], branch);
+        node = branch;
+      } else node = child;
+      offset += common;
+    }
+    node.index = index;
+  });
   const mailId = (source: string) => {
+    let node = root, offset = 0;
     let best: number | undefined;
-    for (let colon = source.indexOf(":"); colon >= 0; colon = source.indexOf(":", colon + 1)) {
-      const index = accountIndexes.get(source.slice(0, colon));
-      if (index !== undefined && (best === undefined || index < best)) best = index;
+    while (offset < source.length) {
+      const child = node.children.get(source[offset]);
+      if (!child || !source.startsWith(child.edge, offset)) break;
+      offset += child.edge.length;
+      node = child;
+      if (source[offset] === ":" && node.index !== undefined && (best === undefined || node.index < best)) best = node.index;
     }
     const original = best === undefined ? undefined : payload.accounts[best];
     return original ? `${accountId(original.id)}:${source.slice(original.id.length + 1)}` : source;
