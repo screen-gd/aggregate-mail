@@ -298,10 +298,9 @@ export function App() {
     const symbolColor = hexColor(tokens.getPropertyValue("--text"));
     if (color && symbolColor) window.desktop?.setOverlay?.({ color, symbolColor });
   }, [appearance, scheme, themePreview]);
-  // Panes that need room drop out as the window narrows: the sender panel, then
-  // the reader beside the list (mail then opens in place), then the sidebar.
+  // Tablets use one reading column; phones also move navigation into a drawer.
   const roomy = useMedia("(min-width: 760px)");
-  const splitRoom = useMedia("(min-width: 980px)");
+  const splitRoom = useMedia("(min-width: 1200px)");
   const split = appearance.reading === "split" && splitRoom;
   const sidebarShown = roomy ? sidebarOpen : mobileSidebarOpen;
   const fromSidebar = (action: () => unknown) => { action(); setMobileSidebarOpen(false); };
@@ -1506,7 +1505,7 @@ export function App() {
               </PaneHeader>}
               <div className="mail-category-bar">
                 <div className="rail-select" ref={setRailSelect} />
-                {view === "inbox" && !query && <InboxTabs tab={tab} unread={tabUnread} onTab={switchTab} />}
+                {view === "inbox" && !query && <InboxTabs tab={tab} unread={tabUnread} onTab={switchTab} compact={!splitRoom} />}
                 <div className="rail-actions" ref={setRailActions} />
               </div>
           <main className={split ? "workspace split" : "workspace"}>
@@ -1536,7 +1535,7 @@ export function App() {
                     focusSelection={!navigationBlocked && !contextMenu}
                     selectedId={selected?.id}
                     density={density}
-                    narrow={split}
+                    narrow={split || !splitRoom}
                     sort={sort}
                     opening={interaction.opening}
                     accounts={state.accounts}

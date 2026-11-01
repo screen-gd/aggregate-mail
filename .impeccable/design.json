@@ -50,6 +50,8 @@
       "card": 30
     },
     "mobileBreakpoint": 760,
+    "readingPaneBreakpoint": 1200,
+    "categoryPickerBreakpoint": 1200,
     "sidebar": 200,
     "desktopTopbar": 52,
     "calendarMonth": 296,

@@ -1170,6 +1170,45 @@ test("side by side uses one column on narrow screens", async () => {
   } finally { await app.close(); }
 });
 
+test("tablet reading uses the available width without an empty reader column", async () => {
+  const app = await mount(false, undefined, {}, [], 1024);
+  try {
+    assert.equal(!!app.container.querySelector(".reader-pane"), false, "tablet must not reserve an empty reader");
+    await app.open("a:1");
+    assert.equal(app.title(), "Alpha");
+    assert.equal(!!app.container.querySelector(".reader-pane"), false);
+    assert.equal(!!app.container.querySelector("[id='mail-a:2']"), false);
+    await app.click(app.button("Close email"));
+    assert.ok(app.container.querySelector("[id='mail-a:2']"));
+  } finally { await app.close(); }
+});
+
+test("phone category picker exposes every category and uses the existing mail filter", async () => {
+  const app = await mount(false, undefined, {}, [], 360);
+  try {
+    const picker = app.container.querySelector<HTMLSelectElement>('select[aria-label="Inbox category"]');
+    assert.ok(picker);
+    assert.deepEqual(Array.from(picker.options, option => option.value), ["primary", "social", "promotions", "newsletters", "transactions", "updates"]);
+    assert.equal(picker.value, "primary");
+    assert.match(picker.options[0].textContent || "", /3 unread/);
+    await act(async () => {
+      picker.value = "promotions";
+      picker.dispatchEvent(new app.window.Event("change", { bubbles: true }));
+    });
+    assert.ok(app.container.querySelector("[id='mail-a:3']"));
+    assert.equal(!!app.container.querySelector("[id='mail-a:1']"), false);
+    assert.equal(!!app.container.querySelector(".inbox-tabs"), false);
+  } finally { await app.close(); }
+});
+
+test("compact phone mail uses measured cards instead of a squeezed desktop row", async () => {
+  const app = await mount(false, (_state, storage) => storage.setItem("emc2.density", "compact"), {}, [], 360);
+  try {
+    assert.equal(app.container.querySelector("[id='mail-a:1']")?.classList.contains("card"), true);
+    assert.equal(!!app.container.querySelector(".mail-list-columns"), false);
+  } finally { await app.close(); }
+});
+
 test("compose preferences survive Settings navigation, close and failed save", async () => {
   const app = await mount();
   try {
