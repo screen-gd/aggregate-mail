@@ -33,6 +33,8 @@ unversioned history without treating it as a release record.
 
 ### Fixed
 
+- Accept fresh phone setup links in an already open pairing tab, resume approval after browser history restores the page, and keep late responses from disabling the current invitation. Connection errors no longer claim that another setup is waiting. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
 - Preserve mail-list scroll during background content updates, keep bulk controls reachable with larger text, and prevent unread dots from covering timestamps. Headless setup accepts trailing-slash host URLs, avoids loading profile data and explains sync/update waits. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 
 - Keep mail text aligned when selection checkboxes disappear, avoid scanning the mailbox again on each selection, show sync waits beside the selected count, and inset the Projects empty message. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))

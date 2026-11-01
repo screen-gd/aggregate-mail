@@ -3446,3 +3446,14 @@ by `src/row-actions.test.tsx`, `src/list-windowing.test.tsx` and `src/bulk-mail.
 the complete stylesheet cascade. It checks the 34px selection gutter in both
 densities and list widths, with checkboxes absent, unchecked and checked. Present
 checkboxes must retain absolute positioning at a 10px left offset.
+
+### Phone pairing tab navigation
+
+The public pairing client handles invitation fragments on both initial load and
+same-document navigation. Each new attempt clears the fragment before making a
+request and ignores responses from earlier attempts. Restoring a page from the
+browser history cache resumes its cookie-bound approval without replaying the
+invitation. Registration remains disabled until the current claim is approved.
+Connection failures show setup guidance without asserting that another request
+exists. Synthetic navigation, stale-response and restore coverage is in
+`scripts/phone-auth.test.mjs`; native passkey prompts need separate device proof.

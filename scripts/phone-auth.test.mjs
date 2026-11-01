@@ -57,3 +57,89 @@ test("phone-initiated setup recovers an expired page and waits for host approval
     assert.equal(dom.window.document.getElementById("passkey-register").disabled,false);
   } finally {dom.window.close();}
 });
+
+test("a fresh invitation in the same pairing tab is claimed without a page reload", async () => {
+  const token = "b".repeat(43);
+  const dom = new JSDOM('<p id="passkey-status"></p><p id="pair-code"></p><button id="passkey-connect" hidden></button><button id="passkey-register" disabled></button>', {
+    url: "https://mail.synthetic-tailnet.ts.net:8444/auth/pair", runScripts: "outside-only",
+  });
+  const claims = [];
+  let claimed = false;
+  dom.window.AbortSignal.timeout = () => new AbortController().signal;
+  dom.window.fetch = async (url, options) => {
+    if (url.endsWith("/pair")) {
+      assert.equal(dom.window.location.hash, "", "remove the new token before making requests");
+      claims.push(JSON.parse(options.body).token); claimed = true;
+    }
+    return claimed ? { ok: true, json: async () => ({ code: "123456", approved: true }) } : { ok: false };
+  };
+  try {
+    dom.window.eval(bundle);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(dom.window.document.getElementById("passkey-register").disabled, true);
+    const navigated = new Promise(resolve => dom.window.addEventListener("hashchange", resolve, { once: true }));
+    dom.window.location.hash = token;
+    await navigated;
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(claims, [token]);
+    assert.equal(dom.window.document.getElementById("passkey-register").disabled, false);
+  } finally { dom.window.close(); }
+});
+
+test("a late failure from the previous page state cannot disable a fresh approved claim", async () => {
+  const dom = new JSDOM('<p id="passkey-status"></p><button id="passkey-register" disabled></button>', {
+    url: "https://mail.synthetic-tailnet.ts.net:8444/auth/pair", runScripts: "outside-only",
+  });
+  let rejectOld, first = true;
+  dom.window.AbortSignal.timeout = () => new AbortController().signal;
+  dom.window.fetch = async () => {
+    if (first) { first = false; return new Promise((_, reject) => rejectOld = reject); }
+    return { ok: true, json: async () => ({ code: "123456", approved: true }) };
+  };
+  try {
+    dom.window.eval(bundle);
+    const navigated = new Promise(resolve => dom.window.addEventListener("hashchange", resolve, { once: true }));
+    dom.window.location.hash = "c".repeat(43);
+    await navigated; await new Promise(resolve => setImmediate(resolve));
+    rejectOld(new TypeError("Synthetic connection ended"));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(dom.window.document.getElementById("passkey-register").disabled, false);
+    assert.match(dom.window.document.getElementById("passkey-status").textContent, /Ready to connect/);
+  } finally { dom.window.close(); }
+});
+
+test("restoring the pairing tab resumes approval without replaying its invitation", async () => {
+  const dom = new JSDOM('<p id="passkey-status"></p><button id="passkey-register" disabled></button>', {
+    url: `https://mail.synthetic-tailnet.ts.net:8444/auth/pair#${"d".repeat(43)}`, runScripts: "outside-only",
+  });
+  const routes = []; let approved = false;
+  dom.window.AbortSignal.timeout = () => new AbortController().signal;
+  dom.window.fetch = async url => { routes.push(url); return { ok: true, json: async () => ({ code: "123456", approved }) }; };
+  try {
+    dom.window.eval(bundle); await new Promise(resolve => setImmediate(resolve));
+    dom.window.dispatchEvent(new dom.window.PageTransitionEvent("pagehide", { persisted: true }));
+    approved = true;
+    dom.window.dispatchEvent(new dom.window.PageTransitionEvent("pageshow", { persisted: true }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(routes.filter(route => route === "/auth/passkey/pair").length, 1);
+    assert.equal(routes.at(-1), "/auth/passkey/pair/status");
+    assert.equal(dom.window.document.getElementById("passkey-register").disabled, false);
+  } finally { dom.window.close(); }
+});
+
+test("a connection failure does not claim that another setup exists", async () => {
+  const dom = new JSDOM('<p id="passkey-status"></p><button id="passkey-connect" hidden></button><button id="passkey-register" disabled></button>', {
+    url: "https://mail.synthetic-tailnet.ts.net:8444/auth/pair", runScripts: "outside-only",
+  });
+  dom.window.AbortSignal.timeout = () => new AbortController().signal;
+  dom.window.fetch = async () => { throw new TypeError("Synthetic offline failure"); };
+  try {
+    dom.window.eval(bundle); await new Promise(resolve => setImmediate(resolve));
+    dom.window.document.getElementById("passkey-connect").click();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.match(dom.window.document.getElementById("passkey-status").textContent, /Could not start setup/);
+    assert.doesNotMatch(dom.window.document.getElementById("passkey-status").textContent, /Another setup|cancel it/);
+    assert.equal(dom.window.document.getElementById("passkey-connect").disabled, false);
+    assert.equal(dom.window.document.getElementById("passkey-register").disabled, true);
+  } finally { dom.window.close(); }
+});
