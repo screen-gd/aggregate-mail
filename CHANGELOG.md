@@ -8,7 +8,7 @@ unversioned history without treating it as a release record.
 
 ### Changed
 
-- Add the Emc² brand mark as `public/favicon.png` so the repository's project icon in T3 Code matches the app icon.
+- Add the Emc² brand mark as `public/favicon.png`. ([#195](https://github.com/collection-of-things/aggregate-mail/pull/195))
 
 ## 0.2.24 - 2026-11-01
 
