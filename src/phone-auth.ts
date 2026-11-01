@@ -57,7 +57,6 @@ if (register) {
   beginPairing(invite); invite = "";
   // Chrome can navigate to a new invitation in this tab without reloading it.
   window.addEventListener("hashchange", () => beginPairing(takeInvitation()));
-  window.addEventListener("pageshow", event => { if (event.persisted) beginPairing(takeInvitation()); });
   register.onclick = async () => {
     const current = generation;
     register.disabled = true;
@@ -83,6 +82,11 @@ if (unlock) unlock.onclick = async () => {
   } catch { message("Could not unlock. Try again, or reconnect this phone from Settings on the host."); unlock.disabled = false; }
 };
 window.addEventListener("pagehide", () => { stopped = true; generation++; invite = ""; if (timer) clearTimeout(timer); });
+window.addEventListener("pageshow", event => {
+  if (!event.persisted) return;
+  if (register) beginPairing(takeInvitation());
+  else if (connect) { stopped = false; generation++; connect.disabled = false; message(""); }
+});
 
 if (connect) connect.onclick = async () => {
   const current = ++generation;

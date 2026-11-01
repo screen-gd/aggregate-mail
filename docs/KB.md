@@ -3453,7 +3453,8 @@ The public pairing client handles invitation fragments on both initial load and
 same-document navigation. Each new attempt clears the fragment before making a
 request and ignores responses from earlier attempts. Restoring a page from the
 browser history cache resumes its cookie-bound approval without replaying the
-invitation. Registration remains disabled until the current claim is approved.
+invitation; restoring the sign-in page also re-enables Connect. Registration
+remains disabled until the current claim is approved.
 Connection failures show setup guidance without asserting that another request
 exists. Synthetic navigation, stale-response and restore coverage is in
 `scripts/phone-auth.test.mjs`; native passkey prompts need separate device proof.

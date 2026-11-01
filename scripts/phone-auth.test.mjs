@@ -143,3 +143,26 @@ test("a connection failure does not claim that another setup exists", async () =
     assert.equal(dom.window.document.getElementById("passkey-register").disabled, true);
   } finally { dom.window.close(); }
 });
+
+test("restoring the sign-in page re-enables Connect and ignores its old request", async () => {
+  const dom = new JSDOM('<p id="passkey-status"></p><button id="passkey-connect">Connect this device</button>', {
+    url: "https://mail.synthetic-tailnet.ts.net:8444/auth", runScripts: "outside-only",
+  });
+  let rejectOld;
+  dom.window.AbortSignal.timeout = () => new AbortController().signal;
+  dom.window.fetch = () => new Promise((_, reject) => { rejectOld = reject; });
+  try {
+    dom.window.eval(bundle);
+    const connect = dom.window.document.getElementById("passkey-connect");
+    connect.click();
+    assert.equal(connect.disabled, true);
+    dom.window.dispatchEvent(new dom.window.PageTransitionEvent("pagehide", { persisted: true }));
+    dom.window.dispatchEvent(new dom.window.PageTransitionEvent("pageshow", { persisted: true }));
+    assert.equal(connect.disabled, false);
+    const restoredMessage = dom.window.document.getElementById("passkey-status").textContent;
+    rejectOld(new TypeError("Synthetic old request ended"));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(connect.disabled, false);
+    assert.equal(dom.window.document.getElementById("passkey-status").textContent, restoredMessage);
+  } finally { dom.window.close(); }
+});
