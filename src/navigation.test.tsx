@@ -97,6 +97,7 @@ async function mount(native = false, setup?: (state: State, storage: Storage) =>
   }
   const previousFetch = globalThis.fetch;
   const mutations: string[] = [];
+  const mailActions: { id: string; action: string }[] = [];
   const requests: string[] = [];
   let savedViews: SavedView[] = [];
   const renames: unknown[] = [];
@@ -176,9 +177,14 @@ async function mount(native = false, setup?: (state: State, storage: Storage) =>
       mutations.push(url);
       const mail = state.messages.find((mail) => url.endsWith(encodeURIComponent(mail.id)));
       await readWait;
-      if (mail) mail.unread = false;
+      if (mail) {
+        const { action } = JSON.parse(String(options.body));
+        mailActions.push({ id: mail.id, action });
+        if (action === "read" || action === "unread") mail.unread = action === "unread";
+        if (action === "archive") mail.archived = true;
+      }
     }
-    return { ok: true, json: async () => url === "/api/state" ? { ...state, csrf: "synthetic" } :
+    return { ok: true, json: async () => url === "/api/state" ? structuredClone({ ...state, csrf: "synthetic" }) :
       url === "/api/contacts" ? { saved: [], recent: [] } :
       url === "/api/workspace" ? { commitments: [], projects: [], decisions: [], proposals: [], coverage: [] } :
       url === "/api/agent/grants" ? [] : url === "/api/mcp" ? {enabled:false,allowSending:false,token:null} :
@@ -264,7 +270,7 @@ async function mount(native = false, setup?: (state: State, storage: Storage) =>
     });
     if (field.closest(".search")) await act(async () => { await new Promise(resolve => setTimeout(resolve, 135)); });
   };
-  return { state, storage: dom.window.localStorage, window: dom.window, container, button, click, choose, openFilters, account, activeAccount, accountButtons, back, forward, open, mouse, key, input, mutations, requests,
+  return { state, storage: dom.window.localStorage, window: dom.window, container, button, click, choose, openFilters, account, activeAccount, accountButtons, back, forward, open, mouse, key, input, mutations, requests, mailActions,
     renames, failRename: (value: boolean) => { renameFails = value; },
     failComposePreferences: (value: boolean) => { composePreferencesFail = value; },
     composeSaveRequests: () => composeSaveRequests,
@@ -3183,4 +3189,120 @@ test("Appearance changes the full-width toolbar immediately and preserves the ch
     await reopened.open("a:1");
     assert.ok(reopened.container.querySelector('.mail-view[data-reader-toolbar="compact"] .mail-category-bar .mail-actions'));
   } finally { await reopened.close(); }
+});
+
+
+test("phone mail gestures target their row, preserve taps and pause during bulk selection", async () => {
+  const app = await mount(false, (_state, storage) => storage.setItem("emc2.interaction.v1", JSON.stringify({ ...defaults, opening: "single" })), {}, [], 390);
+  const row = (id: string) => app.container.querySelector<HTMLElement>(`[id='mail-${id}']`)!;
+  const touch = (target: Element, type: string, x = 150, y = 100) => {
+    const point = { identifier: 1, clientX: x, clientY: y };
+    const event = new app.window.Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperties(event, { touches: { value: type === "touchend" || type === "touchcancel" ? [] : [point] }, changedTouches: { value: [point] } });
+    target.dispatchEvent(event);
+  };
+  const swipe = async (id: string, right: boolean) => {
+    const target = row(id);
+    await act(async () => {
+      touch(target, "touchstart"); touch(target, "touchmove", right ? 250 : 50); touch(target, "touchend", right ? 250 : 50);
+    });
+    await act(async () => target.dispatchEvent(new app.window.MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 })));
+  };
+  const hold = async (id: string) => {
+    const target = row(id);
+    await act(async () => { touch(target, "touchstart"); await new Promise(resolve => setTimeout(resolve, 480)); });
+    await act(async () => {
+      touch(target, "touchend");
+      target.dispatchEvent(new app.window.MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+    });
+  };
+  try {
+    await swipe("a:2", true);
+    assert.deepEqual(app.mailActions, [{ id: "a:2", action: "read" }]);
+    assert.equal(app.title(), undefined, "the synthetic click after a swipe must not open mail");
+    assert.equal(app.container.querySelector(".app")?.getAttribute("data-view"), "inbox");
+    await swipe("a:2", true);
+    assert.deepEqual(app.mailActions.at(-1), { id: "a:2", action: "unread" });
+    assert.ok(row("a:2").classList.contains("unread"));
+    await hold("a:1");
+    assert.equal(row("a:1").closest(".mail-row")?.querySelector('[role="checkbox"]')?.getAttribute("aria-checked"), "true");
+    assert.equal(app.title(), undefined, "holding never opens or marks read");
+    await swipe("a:1", false); await swipe("a:2", false); await swipe("b:1", true);
+    assert.equal(app.mailActions.length, 2, "selection blocks swipes on selected and unselected rows");
+    await hold("b:1");
+    assert.equal(app.container.querySelectorAll('.mail-select[aria-checked="true"]').length, 2);
+    await hold("a:1"); await hold("b:1");
+    await swipe("a:2", false);
+    assert.deepEqual(app.mailActions.at(-1), { id: "a:2", action: "archive" });
+    assert.equal(!!row("a:2"), false, "archived mail leaves Inbox");
+    assert.ok(row("a:1")); assert.ok(row("b:1"));
+    // A fresh tap still opens through the configured single-click action.
+    await act(async () => { touch(row("b:1"), "touchstart"); touch(row("b:1"), "touchend"); });
+    await app.click(row("b:1"));
+    assert.equal(app.title(), "Gamma");
+  } finally { await app.close(); }
+});
+
+test("phone mail gesture preference persists independently and blocked mail stays unchanged", async () => {
+  const app = await mount(false, undefined, {}, [], 390);
+  const swipe = async (id: string) => {
+    const target = app.container.querySelector(`[id='mail-${id}']`)!;
+    await act(async () => {
+      for (const type of ["touchstart", "touchmove", "touchend"]) {
+        const point = { identifier: 1, clientX: type === "touchstart" ? 150 : 50, clientY: 100 };
+        const event = new app.window.Event(type, { bubbles: true, cancelable: true });
+        Object.defineProperties(event, { touches: { value: type === "touchend" ? [] : [point] }, changedTouches: { value: [point] } });
+        target.dispatchEvent(event);
+      }
+    });
+  };
+  let saved = "";
+  try {
+    await app.click(app.button("Show sidebar"));
+    await swipe("a:2");
+    assert.equal(app.mailActions.length, 0, "drawer makes the underlying mail inert");
+    await app.click(app.button("Hide sidebar"));
+    await app.click(app.button("Show sidebar"));
+    await app.click(app.button("Settings"));
+    await app.click(app.button("Keyboard and mouse"));
+    const toggle = [...app.container.querySelectorAll("label")].find(label => label.textContent === "Phone mail gestures")!.querySelector<HTMLInputElement>("input")!;
+    await app.click(toggle);
+    saved = app.storage.getItem("emc2.interaction.v1")!;
+    assert.equal(JSON.parse(saved).mailGestures, false);
+    assert.equal(JSON.parse(saved).touchNavigation, true);
+    await app.click(app.button("Close settings"));
+    await swipe("a:2");
+    assert.equal(app.mailActions.length, 0);
+  } finally { await app.close(); }
+  const restored = await mount(false, (_state, storage) => storage.setItem("emc2.interaction.v1", saved), {}, [], 390);
+  try { assert.equal(restored.container.querySelector("[data-mail-gestures]"), null); }
+  finally { await restored.close(); }
+});
+
+
+test("mail swipe guards keep syncing, sent, archived and desktop mail unchanged", async () => {
+  for (const guard of ["sync", "sent", "archived", "desktop", "wide"] as const) {
+    const app = await mount(false, state => {
+      if (guard === "sync") state.syncing = true;
+      if (guard === "sent") state.messages[0].direction = "sent";
+      if (guard === "archived") state.messages[0].archived = true;
+    }, {}, [], guard === "desktop" ? undefined : guard === "wide" ? 1200 : 390);
+    try {
+      if (guard === "sent" || guard === "archived") {
+        await app.click(app.button("Show sidebar"));
+        await app.click(app.button("All cached"));
+      }
+      const target = app.container.querySelector("[id='mail-a:1']")!;
+      assert.ok(target);
+      await act(async () => {
+        for (const type of ["touchstart", "touchmove", "touchend"]) {
+          const point = { identifier: 1, clientX: type === "touchstart" ? 150 : 50, clientY: 100 };
+          const event = new app.window.Event(type, { bubbles: true, cancelable: true });
+          Object.defineProperties(event, { touches: { value: type === "touchend" ? [] : [point] }, changedTouches: { value: [point] } });
+          target.dispatchEvent(event);
+        }
+      });
+      assert.equal(app.mailActions.length, 0, guard + " must not archive");
+    } finally { await app.close(); }
+  }
 });

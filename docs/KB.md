@@ -1696,6 +1696,14 @@ block navigation. Notifications use the same recognizer for dismissal.
 `src/touch-gestures.test.tsx` and mounted navigation/toast checks cover these
 paths synthetically; physical phone gesture acceptance remains separate.
 
+The separate `mailGestures` preference defaults on for phone browser mail rows.
+Left swipe calls the existing Archive menu action, right swipe calls Read or
+Unread, and a stationary 450ms hold toggles bulk selection. Rows claim gestures
+before history navigation; bulk selection blocks row swipe actions. Action
+availability, sync and modal guards remain in App and BulkMailSelection.
+Movement, cancellation, blur, unmount and disabled controls cancel pending holds.
+Gesture-generated clicks are suppressed without blocking keyboard activation.
+
 On Windows and Linux, [Electron main](../desktop/main.ts) forwards the
 documented `app-command` values `browser-backward` and `browser-forward`
 through the [preload bridge](../desktop/preload.ts). The renderer suppresses

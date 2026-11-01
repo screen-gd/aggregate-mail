@@ -34,6 +34,10 @@ export function InteractionSettings({ value, onChange }: {
     <label className="settings-row"><span>Phone swipes navigate Back / Forward</span>
       <input type="checkbox" role="switch" checked={value.touchNavigation} onChange={event => onChange({ ...value, touchNavigation: event.target.checked })} />
     </label>
+    <label className="settings-row"><span>Phone mail gestures</span>
+      <input type="checkbox" role="switch" checked={value.mailGestures} onChange={event => onChange({ ...value, mailGestures: event.target.checked })} />
+    </label>
+    <details className="settings-help"><summary>Mail gestures</summary><p>Swipe left to archive, right to mark read or unread. Hold to select. Swipes pause while messages are selected.</p></details>
 
     <div className="interaction-shortcuts-heading">
       <h2>Keyboard shortcuts</h2>

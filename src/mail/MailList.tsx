@@ -1,4 +1,4 @@
-import { useCallback, useContext, type KeyboardEvent, type MouseEvent, type RefObject } from "react";
+import { useCallback, useContext, type KeyboardEvent, type MouseEvent, type RefObject, type ReactNode } from "react";
 import type { Account, RendererMail as Mail } from "../../shared/types";
 import { previewText } from "../../shared/mail-content";
 import type { InteractionPreferences } from "../interaction";
@@ -12,12 +12,26 @@ import { Avatar } from "./Avatar";
 import { relative, shortLabel } from "./format";
 import { BulkSelectionContext, selectionKey } from "./bulk-selection";
 import { accountLabel } from "../mail-ui";
+import { useSwipe } from "../ui/useSwipe";
 
 type RowLayout = "inline" | "card";
 type RowAction = Omit<MenuAction, "run"> & { run: (event: MouseEvent<HTMLButtonElement>) => void };
 // Toolbar order: Archive (or Move to Inbox), Snooze, Trash, then Reply, read state and Pin.
 const rowIcons = { archive: Archive, inbox: Inbox, snooze: Clock, unsnooze: Inbox, trash: Trash, reply: Reply, read: Check, unread: MailIcon, pin: Pin };
 const rowOrder = Object.keys(rowIcons);
+
+function MailGestureRow({ mail, enabled, onSwipe, children }: {
+  mail: Mail; enabled: boolean; onSwipe?: (direction: "left" | "right") => void; children: ReactNode;
+}) {
+  const bulk = useContext(BulkSelectionContext);
+  const ref = useSwipe(direction => {
+    if (!bulk?.selected.size) onSwipe?.(direction);
+  }, enabled && !bulk?.disabled, bulk ? () => bulk.toggle(mail, false) : undefined);
+  return <div ref={ref} data-mail-gestures={enabled ? "" : undefined}
+    className={`mail-row${bulk?.selected.has(selectionKey(mail)) ? " bulk-selected" : ""}`}>
+    {children}
+  </div>;
+}
 
 /**
  * Mail rows under sticky date headings. Comfortable lists use the rebuild
@@ -30,6 +44,7 @@ const rowOrder = Object.keys(rowIcons);
 export function MailList<T extends Mail>({
   messages, selectedId, density, narrow, sort, opening, accounts, listRef, focusSelection,
   onOpen, onSelect, onMenu, onMenuKey, actions, showAccount = accounts.length > 1,
+  mailGestures = false, onSwipe,
 }: {
   messages: T[];
   listRef: RefObject<HTMLElement | null>;
@@ -46,6 +61,8 @@ export function MailList<T extends Mail>({
   onMenu: (event: MouseEvent<HTMLElement>, mail: T) => void;
   onMenuKey: (event: KeyboardEvent<HTMLElement>, mail: T) => void;
   actions?: (mail: T) => RowAction[];
+  mailGestures?: boolean;
+  onSwipe?: (mail: T, direction: "left" | "right") => void;
 }) {
   const cardLayout = narrow || density === "comfortable";
   const cardContent = useCallback((mail: T) => ({
@@ -82,7 +99,7 @@ export function MailList<T extends Mail>({
     const time = <time>{relative(m.date)}</time>;
     return (
       <MailPrivacy key={m.id} mail={m}>
-        <div className={`mail-row${bulk?.selected.has(selectionKey(m)) ? " bulk-selected" : ""}`}>
+        <MailGestureRow mail={m} enabled={mailGestures} onSwipe={direction => onSwipe?.(m, direction)}>
           {bulk && <button type="button" role="checkbox" className="mail-select"
             aria-label={`Select message ${index + 1}`} aria-checked={bulk.selected.has(selectionKey(m))}
             disabled={bulk.disabled} onClick={event => bulk.toggle(m, event.shiftKey)}>
@@ -159,7 +176,7 @@ export function MailList<T extends Mail>({
               <More size={16} />
             </button>
           </div>
-        </div>
+        </MailGestureRow>
       </MailPrivacy>
     );
   }}</MailListWindow></>;

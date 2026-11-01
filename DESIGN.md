@@ -427,6 +427,12 @@ controls, selected text, horizontal scrollers, zoomed pages and the outer
 work. Notifications support horizontal swipe dismissal through their existing
 close action, with no additional page instructions.
 
+Phone mail rows use left swipe to archive, right swipe to toggle read/unread,
+and a stationary 450ms hold to select. Mail gestures have a separate switch in
+Keyboard and mouse settings. Enabled rows own their gestures instead of also
+triggering history navigation. Bulk selection pauses row swipe actions; hold
+can add or remove a selection. Existing action guards and notifications apply.
+
 macOS horizontal navigation gestures use the existing back/forward history.
 Vertical gestures retain ordinary scrolling. Dialog, compose and busy guards
 apply to gesture navigation too.

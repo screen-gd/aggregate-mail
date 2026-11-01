@@ -14,8 +14,8 @@ test("touch swipes preserve scrolling, controls, zoom, selection and browser edg
   const root = createRoot(dom.window.document.getElementById("root")!);
   const actions: string[] = [];
   let clicks = 0;
-  function Harness({ enabled = true, name = "" }: { enabled?: boolean; name?: string }) {
-    const ref = useSwipe(direction => actions.push(name + direction), enabled);
+  function Harness({ enabled = true, name = "", onHold }: { enabled?: boolean; name?: string; onHold?: () => void }) {
+    const ref = useSwipe(direction => actions.push(name + direction), enabled, onHold);
     return <div ref={ref} className={name === "toast:" ? "toast" : ""}><span id="surface">Surface</span>
       <button className="row" onClick={() => clicks++}>Mail</button><button id="control" onClick={() => clicks++}>Action</button>
       <div role="dialog"><span id="dialog-content">Filter options</span></div>
@@ -86,6 +86,36 @@ test("touch swipes preserve scrolling, controls, zoom, selection and browser edg
     actions.length = 0;
     swipe(dom.window.document.getElementById("control")!);
     assert.deepEqual(actions, [], "toast action controls remain taps");
+    let holds = 0;
+    const onHold = () => { holds++; };
+    await act(async () => root.render(<Harness onHold={onHold} />));
+    const holdRow = dom.window.document.querySelector(".row")!;
+    await act(async () => {
+      touch(holdRow, "touchstart", [point(150, 100)]);
+      await new Promise(resolve => setTimeout(resolve, 480));
+    });
+    assert.equal(holds, 1);
+    touch(holdRow, "touchend", [point(150, 100)]);
+    const beforeClick = clicks;
+    // Disabling after a gesture must retain suppression of its synthesized click.
+    await act(async () => root.render(<Harness enabled={false} onHold={onHold} />));
+    holdRow.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+    assert.equal(clicks, beforeClick);
+    for (const cancelKind of ["scroll", "cancel", "blur", "disable", "pinch", "inert"] as const) {
+      await act(async () => root.render(<Harness onHold={onHold} />));
+      const target = dom.window.document.querySelector(".row")!;
+      if (cancelKind === "inert") target.parentElement!.setAttribute("inert", "");
+      touch(target, "touchstart", [point(150, 100)]);
+      if (cancelKind === "scroll") touch(target, "touchmove", [point(150, 130)]);
+      if (cancelKind === "cancel") touch(target, "touchcancel", []);
+      if (cancelKind === "blur") dom.window.dispatchEvent(new dom.window.Event("blur"));
+      if (cancelKind === "pinch") touch(target, "touchstart", [point(150, 100), point(170, 100, 2)]);
+      if (cancelKind === "disable") await act(async () => root.render(<Harness enabled={false} onHold={onHold} />));
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 480)); });
+      touch(target, "touchend", [point(150, 100)]);
+      target.parentElement!.removeAttribute("inert");
+      assert.equal(holds, 1, cancelKind + " cancels the hold");
+    }
     const dismissed: number[] = [];
     dom.window.matchMedia = (() => ({ matches: true })) as unknown as typeof dom.window.matchMedia;
     await act(async () => root.render(<div role="dialog"><ToastStack toasts={[{ id: 42, text: "Needs attention", kind: "error", duration: 0 }]}

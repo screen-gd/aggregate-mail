@@ -1551,6 +1551,12 @@ export function App() {
                     narrow={split || !splitRoom}
                     sort={sort}
                     opening={interaction.opening}
+                    mailGestures={ready && !window.desktop && !roomy && interaction.mailGestures}
+                    onSwipe={(mail, direction) => {
+                      if (navigationBlocked || mobileSidebarOpen || contextMenu || palette || busy || syncing || eventDirty) return;
+                      const action = mailMenuActions(mail).find(item => item.id === (direction === "left" ? "archive" : mail.unread ? "read" : "unread"));
+                      if (action && !action.disabled) action.run();
+                    }}
                     accounts={state.accounts}
                     showAccount={accountFilter === "all" && state.accounts.length > 1}
                     actions={(mail) => mailMenuActions(mail).map((action) => action.id === "snooze"

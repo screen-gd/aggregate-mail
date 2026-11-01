@@ -16,6 +16,8 @@ unversioned history without treating it as a release record.
 
 ### Added
 
+- On phones, swipe a mail row left to archive, right to toggle read/unread, or hold to select. Mail gestures have their own switch in Keyboard and mouse settings; swipe actions pause during bulk selection. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
 - Connect a phone to a headless host with `npm run phone:link`: open the private one-time link and save a passkey without a second host-screen approval. Existing QR pairing still requires matching-code approval. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 
 ### Changed

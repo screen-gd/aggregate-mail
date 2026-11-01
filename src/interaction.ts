@@ -39,12 +39,14 @@ export type InteractionPreferences = {
   opening: "double" | "single";
   mouseHistory: boolean;
   touchNavigation: boolean;
+  mailGestures: boolean;
   shortcuts: Record<InteractionAction, Shortcut>;
 };
 export const defaults: InteractionPreferences = {
   opening: "double",
   mouseHistory: true,
   touchNavigation: true,
+  mailGestures: true,
   shortcuts: Object.fromEntries(interactionActions.map((action) =>
     [action.id, { key: action.key, alt: "alt" in action && action.alt, shift: "shift" in action && action.shift, ...("prefix" in action ? { prefix: action.prefix } : {}) }])) as InteractionPreferences["shortcuts"],
 };
@@ -106,6 +108,7 @@ export function read(): InteractionPreferences {
     const input = stored as Record<string, unknown>;
     const value = fallback();
     if (typeof input.touchNavigation === "boolean") value.touchNavigation = input.touchNavigation;
+    if (typeof input.mailGestures === "boolean") value.mailGestures = input.mailGestures;
     if (typeof input.mouseHistory === "boolean") value.mouseHistory = input.mouseHistory;
     if (input.opening === "single") value.opening = "single";
     if (!input.shortcuts || typeof input.shortcuts !== "object") return value;
@@ -133,7 +136,7 @@ export function save(value: InteractionPreferences): boolean {
   if (!["double", "single"].includes(value.opening) || interactionActions.some(({ id }) => validateShortcut(id, value.shortcuts[id], value))) return false;
   try {
     // Serialize only the preference contract, never unrelated object fields.
-    localStorage.setItem(storageKey, JSON.stringify({ opening: value.opening, mouseHistory: value.mouseHistory, touchNavigation: value.touchNavigation,
+    localStorage.setItem(storageKey, JSON.stringify({ opening: value.opening, mouseHistory: value.mouseHistory, touchNavigation: value.touchNavigation, mailGestures: value.mailGestures,
       shortcuts: Object.fromEntries(interactionActions.map(({ id }) => [id, canonical(value.shortcuts[id])])) }));
     return true;
   } catch { return false; }
