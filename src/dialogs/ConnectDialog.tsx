@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useRef, useState } from "react";
 import { appPasswordHelp, providerNames, type Provider } from "../../shared/types";
 import { credentialStorageFooter } from "../shell/CredentialFallbackNotice";
@@ -38,7 +39,7 @@ export function ProviderChoices({ api, googleConfigured, busy, onChoose }: {
           )}
         </div>
       )}
-      {googleConfigured && googleError && <p role="alert">{googleError}</p>}
+      {googleConfigured && googleError && <Notice text={googleError} />}
       {(["gmail-imap", "icloud", "fastmail", "yahoo", "imap"] as const).map((provider) => (
         <div key={provider} className="provider-row">
           <ProviderIcon provider={provider} />
@@ -66,7 +67,7 @@ export function ConnectDialog({
   onBack?: () => void;
 }) {
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const submitting = useRef(false);
   const unavailable = busy || pending;
   return (
@@ -165,7 +166,7 @@ export function ConnectDialog({
             </div>
           </>
         )}
-        {error && <p className="attention" role="alert"><Redact text={error} /></p>}
+        {error && <Notice text={error} />}
         <div className="form-actions">
           <span>{credentialStorageFooter(globalThis.window?.desktop?.credentialFallback)}</span>
           {onBack && <button className="link" type="button" disabled={unavailable} onClick={onBack}>Back</button>}

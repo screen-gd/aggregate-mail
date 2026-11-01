@@ -81,7 +81,7 @@ export function Calendar({ items, messages = [], events = [], now, selectedEvent
         {onNewEvent && <button type="button" className="button" onClick={() => onNewEvent(day.startsWith(month) ? day : `${month}-01`)}>New event</button>}</div>
     </div>
     {view === "day" || view === "week" ? <>
-      <p className="work-meta">Device local time. Spans show elapsed duration; follow-ups and snoozes are points. Open entries below the schedule.</p>
+      <p className="work-meta">Local time</p>
       <div className="calendar-schedule" role="region" aria-label={`${view === "week" ? "Week" : "Day"} schedule`} tabIndex={0}>
         <div className={`calendar-schedule-columns calendar-columns-${view}`}>
           {scheduleDays.map(value => {

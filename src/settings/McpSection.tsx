@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useEffect, useState } from "react";
 import type { McpSettings } from "../../shared/types";
 import type { Api, Perform } from "../api";
@@ -18,7 +19,7 @@ export function McpSection({
 }) {
   const [settings, setSettings] = useState<McpSettings | null>(null);
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   useEffect(() => {
     void api<McpSettings>("/mcp")
       .then(setSettings)
@@ -59,12 +60,12 @@ export function McpSection({
           <ChevronDown color="currentColor" size={12} className={open ? "up" : undefined} />
         </button>
       </div>
-      <p className="note">
+      {open && <p className="note">
         Enable the local connection for external agents. Choose each assistant’s accounts
         and permissions above. Mail changes need your review; direct project
         and commitment creation needs a separate permission. The legacy token has no account access.
-      </p>
-      {error && <p role="alert">{error}</p>}
+      </p>}
+      {error && <Notice text={error} />}
       {settings && (
         <>
           <div className="settings-group">

@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useContext, useEffect, useState } from "react";
 import type { PhoneAccessStatus } from "../../shared/phone-access";
 import type { Api } from "../api";
@@ -8,7 +9,7 @@ export function PhoneAccessSettings({ api, onCopied }: { api: Api; onCopied: (me
   const { on: privacy } = useContext(PrivacyContext);
   const [status, setStatus] = useState<PhoneAccessStatus>();
   const [busy, setBusy] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   useEffect(() => {
     let active = true;
     void api<PhoneAccessStatus>("/phone-access").then((value) => { if (active) setStatus(value); })
@@ -33,20 +34,19 @@ export function PhoneAccessSettings({ api, onCopied }: { api: Api; onCopied: (me
   };
   return <section aria-busy={busy}>
     <h2>Private browser access</h2>
-    <p className="note">Connect once, then open your inbox with your phone’s screen lock.</p>
-    <ol className="note">
+    <details className="settings-help"><summary>Connection help</summary><ol className="note">
       <li>Keep the browser host running and connect both devices to Tailscale.</li>
       <li>Enable phone access here, then choose Connect phone.</li>
       <li>Scan the QR from another screen, or open the setup link on your phone.</li>
       <li>Compare the code, approve here and save the passkey on your phone.</li>
-    </ol>
+    </ol></details>
     {status && !status.supported && <div className="settings-group">
       <h3>Start the browser host first</h3>
       <p className="note">Phone access uses the protected browser host, not the desktop app. Start it using the Local browser access instructions in the README, then open its localhost address and unlock with your recovery passphrase. Return to Settings → Phone access there.</p>
       <p className="note">The browser host has a separate encrypted profile. Your desktop accounts do not move automatically.</p>
     </div>}
     <p role="status">{busy ? "Checking phone access…" : status?.message}</p>
-    {error && <p role="alert">{error}</p>}
+    {error && <Notice text={error} />}
     {status?.url && status.state === "ready" && !busy && <div className="settings-group">
       <div className="mcp-copy"><div><strong>Private HTTPS address</strong><p>{privacy ? "Address hidden while Privacy is on." : <a href={status.url} target="_blank" rel="noreferrer">{status.url}</a>}</p></div>
         {!privacy && <button type="button" onClick={() => {

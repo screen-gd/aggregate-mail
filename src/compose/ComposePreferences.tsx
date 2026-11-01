@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { changeComposeText } from "../../shared/compose-content";
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import type { ComposePreferences, ComposeTemplate } from "../../shared/mail-features";
@@ -45,7 +46,7 @@ export function ComposePreferenceControls({ draft, preferences, busy, onChange }
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   useEffect(() => { if (busy) setOpen(false); }, [busy]);
   useEffect(() => {
     if (!open) return;
@@ -116,7 +117,7 @@ export function ComposePreferenceControls({ draft, preferences, busy, onChange }
     </div>
     <button className="button" type="button" disabled={busy || !active}
       onClick={() => insert(active)}>Insert template</button>
-    <p className="note">Adds text to your message. The subject is filled only when empty.</p>
-    {error && <p role="alert">{error}</p>}
+
+    {error && <Notice text={error} />}
   </div>;
 }

@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Account, Draft, DraftSummary } from "../../shared/types";
 import type { Api } from "../api";
@@ -19,7 +20,7 @@ export function DraftList({ accounts, api, accountFilter, query, refreshKey, act
   const [unavailable, setUnavailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const [attempt, setAttempt] = useState(0);
   const localSearch = useMailSearch(suppliedSearch ? "" : query, accounts, [], api, typeof refreshKey === "string" ? refreshKey : undefined);
   const search = suppliedSearch ?? localSearch;
@@ -131,7 +132,7 @@ export function DraftList({ accounts, api, accountFilter, query, refreshKey, act
     <section ref={list} className="draft-list" aria-label="Saved drafts" aria-busy={pending || opening}>
     <div className={`draft-list-heading${pending || unavailable ? "" : searching ? "" : " visually-hidden"}`} aria-live="polite"><span>{pending ? "Loading drafts…" : unavailable ? loaded ? `${visible.length} cached ${visible.length === 1 ? "draft" : "drafts"} · Count unavailable until refresh` : "Draft count unavailable" : `${visible.length} ${visible.length === 1 ? "draft" : "drafts"} · Saved on this device`}</span>
       </div>
-    {problem && <p className="draft-list-error" role="alert">{problem}</p>}
+    {problem && <Notice text={problem} />}
     {!pending && !problem && !visible.length && <p className="work-empty">{query ? "No matching drafts." : "No saved drafts in this account."}</p>}
     <ul>{visible.map((draft, index) => {
       const accountIndex = accounts.findIndex((account) => account.id === draft.accountId);

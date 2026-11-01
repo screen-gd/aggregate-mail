@@ -34,7 +34,7 @@ async function mount(preferences?: NotificationPreferences, revisionContract = f
     subject: `Private Reader message ${uid}`, body: "Synthetic body", preview: "Preview",
     date: 2000 - uid, unread: true, labelIds: ["INBOX", "UNREAD"],
     category: "important", relevance: 2, reason: "", archived: false, snoozedUntil: null,
-    html: null, images: [], messageId: `<${accountId}-${uid}@example.com>`,
+    html: null, images: [], attachments: [], messageId: `<${accountId}-${uid}@example.com>`,
   });
   const state: State = {
     unreadArrivals: 0, composePreferences: { templates: [], signatures: {} },
@@ -85,7 +85,11 @@ async function mount(preferences?: NotificationPreferences, revisionContract = f
   globalThis.fetch = async (input, options) => {
     const url = String(input);
     let data: unknown = {};
-    if (url === "/api/outbox") data = [];
+    if (url.endsWith("/conversation")) {
+      const mail = state.messages.find(value => url.includes(encodeURIComponent(value.id)))!;
+      data = { accountId: mail.accountId, messages: [mail], gaps: [], source: "local", canExpand: false };
+    } else if (url.startsWith("/api/calendar/offers?")) data = { fingerprint: "synthetic", offers: [], settings: null, google: [] };
+    else if (url === "/api/outbox") data = [];
     else if (url.startsWith("/api/state")) {
       stateRequests.push(url);
       if (rejectRefresh) throw new Error("Synthetic refresh failure");
@@ -106,6 +110,10 @@ async function mount(preferences?: NotificationPreferences, revisionContract = f
           messages: delta ? snapshot.messages.filter(m => sentRecords.get(m.id)!.revision > Number(priorRevision)) : snapshot.messages,
           removedMailIds: delta ? [...removals].filter(([, r]) => r > Number(priorRevision)).map(([id]) => id) : [] };
       }
+    } else if (url === "/api/workspace") {
+      data = { commitments: [], projects: [], decisions: [], proposals: [], coverage: [] };
+    } else if (url === "/api/agent/grants") {
+      data = [];
     } else if (url === "/api/sync") {
       data = { errors: [] };
     } else if (options?.method === "POST" && url.endsWith("/undo")) {
@@ -336,7 +344,7 @@ test("the snooze menu accepts a custom future time, rejects a past one and close
     input.value = localValue(past);
     await submit(input.closest("form")!);
     assert.equal(app.mutations.length, 0, "a past time sends no request");
-    assert.equal(menu()!.querySelector('[role="alert"]')!.textContent, "Choose a time in the future.");
+    assert.equal(app.container.querySelector('.toast-error [role="alert"]')!.textContent, "Choose a time in the future.");
     const future = new Date(Date.now() + 48 * 3600000); future.setMinutes(0, 0, 0);
     input.value = localValue(future);
     await submit(input.closest("form")!);
@@ -380,7 +388,7 @@ test("the reader's Change time reschedules a snooze and restores focus on Escape
     }
     input.value = localValue(new Date(Date.now() - 3600000));
     await submit(input.closest("form")!);
-    assert.equal(menu()!.querySelector('[role="alert"]')!.textContent, "Choose a time in the future.");
+    assert.equal(app.container.querySelector('.toast-error [role="alert"]')!.textContent, "Choose a time in the future.");
     await app.key("Escape", input);
     assert.equal(menu(), null);
     assert.equal(app.container.ownerDocument.activeElement, changeTime, "Escape returns focus to Change time");
@@ -568,7 +576,7 @@ test("saved Compose settings reach new drafts, templates and account signatures 
     const settings = app.container.querySelector<HTMLElement>(".compose-settings")!;
     assert.ok(settings);
     await app.click(app.button("Save compose preferences", settings));
-    assert.match(settings.textContent!, /Compose preferences saved/);
+    assert.match(app.container.querySelector(".toast-stack")!.textContent!, /Compose preferences saved/);
     await app.click(app.button("Close settings"));
     await app.key("c");
     const dialog = app.dialog();
@@ -681,7 +689,7 @@ test("mounted Notifications settings honor persisted choices, preview, changes, 
     assert.deepEqual([...switches].map((input) => input.checked), [false, false, true, false, false, false, true]);
     assert.deepEqual([...settings.querySelectorAll('[role="radio"][aria-checked="true"]')].map(button => button.textContent), ["Top right", "Until dismissed", "System default"]);
     assert.equal(settings.querySelector("select"), null);
-    assert.match(settings.textContent!, /Errors stay visible until dismissed/);
+    assert.doesNotMatch(settings.textContent!, /Choose how new mail gets your attention/);
     await app.click(app.button("Preview notification", settings));
     assert.equal(app.container.querySelector(".toast-info"), null, "preview obeys the disabled in-app switch");
     const preview = settings.querySelector('[aria-label="Notification preview settings"]')!;

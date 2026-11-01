@@ -1226,7 +1226,8 @@ test("compose preferences survive Settings navigation, close and failed save", a
     app.failComposePreferences(true);
     await act(async () => app.container.querySelector(".compose-settings")!.dispatchEvent(new app.window.Event("submit", { bubbles: true, cancelable: true })));
     assert.equal(signature().value, "A retained signature");
-    assert.match(app.container.querySelector(".compose-settings [role=alert]")?.textContent || "", /edits are kept/);
+    assert.equal(app.container.querySelector(".compose-settings [role=alert]"), null);
+    assert.match(app.container.querySelector(".toast-stack")?.textContent || "", /edits are kept/);
     app.failComposePreferences(false);
     await act(async () => app.container.querySelector(".compose-settings")!.dispatchEvent(new app.window.Event("submit", { bubbles: true, cancelable: true })));
     assert.equal(app.state.composePreferences?.signatures.a, "A retained signature");
@@ -1576,7 +1577,7 @@ test("Settings rename persists through PATCH and reload, clears to email, cancel
     await app.click(app.button("Rename")); await app.input(form().querySelector("input")!, "Keep this name");
     app.failRename(true); await submit();
     assert.equal(form().querySelector<HTMLInputElement>("input")!.value, "Keep this name");
-    assert.match(form().querySelector('[role="alert"]')!.textContent!, /Could not rename/);
+    assert.match(app.container.querySelector(".toast-stack")!.textContent!, /Could not rename/);
     assert.equal(app.state.accounts[0].name, "Personal inbox");
     app.failRename(false); await app.input(form().querySelector("input")!, "x".repeat(81)); await submit();
     assert.deepEqual(app.renames.at(-1), { url: "/api/accounts/a", body: { name: "x".repeat(80) } });
@@ -2307,7 +2308,7 @@ test("Find pinned mail searches this view or All cached and keeps the selected a
   try {
     await app.click(app.account("first@example.com"));
     await app.openFilters();
-    assert.match(app.container.querySelector(".pinned-help")?.textContent || "", /Pin keeps mail for reference/);
+    assert.equal(app.container.querySelector(".pinned-help"), null, "filters keep controls without permanent coaching");
     await app.click(app.button("Find pinned mail in this view"));
     assert.equal(app.container.querySelector('[aria-label="Mail filters and sort"]'), null, "the popover closes");
     assert.equal(app.container.querySelector<HTMLInputElement>(".search input")!.value, "is:pinned");
@@ -2651,6 +2652,41 @@ test("pending sequences preserve Escape, Tab and system shortcuts", async () => 
   } finally { await app.close(); }
 });
 
+test("phone swipes traverse history and respect scroll, Settings and the saved preference", async () => {
+  const app = await mount(false, undefined, {}, [], 390);
+  const swipe = async (right: boolean, vertical = false) => {
+    const target = app.container.querySelector(".app-main")!;
+    await act(async () => {
+      for (const type of ["touchstart", "touchmove", "touchend"]) {
+        const point = { identifier: 1, clientX: type === "touchstart" ? 150 : right ? 250 : 50,
+          clientY: type !== "touchstart" && vertical ? 250 : 100 };
+        const event = new app.window.Event(type, { bubbles: true, cancelable: true });
+        Object.defineProperties(event, { touches: { value: type === "touchend" ? [] : [point] }, changedTouches: { value: [point] } });
+        target.dispatchEvent(event);
+      }
+    });
+  };
+  const view = () => app.container.querySelector(".app")?.getAttribute("data-view");
+  try {
+    await app.click(app.button("Show sidebar"));
+    await app.click(app.button("Today"));
+    assert.equal(view(), "actions");
+    await swipe(true, true); assert.equal(view(), "actions");
+    await swipe(true); assert.equal(view(), "inbox");
+    await swipe(false); assert.equal(view(), "actions");
+    await app.click(app.button("Show sidebar"));
+    await app.click(app.button("Settings"));
+    await swipe(true); assert.equal(view(), "settings");
+    await app.click(app.button("Keyboard and mouse"));
+    const toggle = [...app.container.querySelectorAll("label")].find(label => label.textContent === "Phone swipes navigate Back / Forward")!.querySelector<HTMLInputElement>("input")!;
+    await app.click(toggle);
+    assert.equal(JSON.parse(app.storage.getItem("emc2.interaction.v1")!).touchNavigation, false);
+    await app.click(app.button("Close settings"));
+    await swipe(true); assert.equal(view(), "actions");
+    assert.equal(app.mutations.length, 0, "view swipes do not change mail");
+  } finally { await app.close(); }
+});
+
 test("phone navigation can leave Today, close the drawer and reopen it for Settings", async () => {
   const app = await mount(false, undefined, {}, [], 390);
   try {
@@ -2858,6 +2894,11 @@ test("search widening preserves query and account and Back restores exact filter
     assert.ok(app.requests.some(url => url === "/api/messages/search?query=Alpha"), "cached fixture search completed");
     assert.match(help().textContent!, /Unread.*High relevance.*Oldest first/);
     assert.equal(help().getAttribute("role"), "status");
+    assert.ok(help().classList.contains("visually-hidden"), "search coverage stays accessible without a permanent banner");
+    assert.equal(app.container.querySelector(".search-help"), null, "search help opens only on request");
+    await app.click(app.button("Search options"));
+    assert.ok(app.container.querySelector(".search-help"), "provider search and syntax remain reachable");
+    await app.click(app.button("Search options"));
     await app.click(app.button("Search all cached mail in this account"));
     assert.equal(app.container.querySelector<HTMLInputElement>(".search input")!.value, "Alpha");
     assert.equal(app.activeAccount(), "first@example.com");

@@ -14,10 +14,10 @@ export function BrandingSection({
 }) {
   return (
     <section className="settings-logos">
-      <p className="note">
+      <details className="settings-help"><summary>About company logos</summary><p className="note">
         Fetch missing company logos for cached senders from theSVG, an open
         brand icon library. Logos stay cached on this computer; unknown companies keep their letter.
-      </p>
+      </p></details>
       <div className="settings-row">
         <span>Company logos</span>
         <button

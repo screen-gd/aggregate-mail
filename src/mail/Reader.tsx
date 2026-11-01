@@ -116,7 +116,7 @@ export function ReaderEmpty({ selected, openKey }: { selected: boolean; openKey:
     <div className="reader-empty">
       <MailIcon color="currentColor" size={28} />
       <p className="empty-title">No email open</p>
-      <p>{selected ? <>Press <kbd>{openKey}</kbd> to open the selected email.</> : "Choose an email to read it here."}</p>
+      <p className="visually-hidden">{selected ? <>Press <kbd>{openKey}</kbd> to open the selected email.</> : "Choose an email to read it here."}</p>
     </div>
   );
 }

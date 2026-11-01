@@ -188,7 +188,8 @@ async function mount(mode: "actions"|"calendar"|"projects"|"agents"|"assistants"
   let currentWork: WorkspaceState;
   const api:Api=async<T,>(url:string,method="GET",body?:unknown):Promise<T>=>{
     requests.push({url,method,body});let result:unknown={};
-    if(url==="/workspace"){
+    if(url==="/outbox")result=[];
+    else if(url==="/workspace"){
       if(refreshFailure)throw new Error("Synthetic refresh failure");
       const snapshot=structuredClone(workspace);
       if(holdReads)return new Promise<T>((resolve,reject)=>heldReads.push({release:()=>resolve(snapshot as T),fail:()=>reject(new Error("Synthetic held read failure"))}));
@@ -818,7 +819,7 @@ test("coverage account labels redact known private names without losing coverage
  }finally{await ui.close();}
 });
 
-test("templates keep source subjects out of private text and attributes and explain dates",async()=>{
+test("templates keep source subjects private and date controls concise",async()=>{
  const ui=await mount();try{
   await ui.click(ui.button("Add task"));
   await ui.click(ui.container.querySelector<HTMLInputElement>('input[type="radio"]')!);
@@ -828,8 +829,8 @@ test("templates keep source subjects out of private text and attributes and expl
   assert.equal(ui.field("What needs to happen").value,"");
   assert.ok(!ui.container.innerHTML.includes("Private Reader"));
   assert.ok(!ui.container.innerHTML.includes("reader@example.com"));
-  assert.ok(ui.container.textContent?.includes("Due date is the day the work is due"));
-  assert.ok(ui.container.textContent?.includes("Reminder is when to look again"));
+  assert.ok(ui.field("Due date"));
+  assert.ok(ui.field("Reminder"));
   assert.ok(ui.container.textContent?.includes("Choose the email this work starts from"));
   assert.equal(ui.requests.some(request=>request.method!=="GET"),false);
  }finally{await ui.close();}

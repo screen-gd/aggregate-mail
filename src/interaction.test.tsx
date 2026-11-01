@@ -137,7 +137,7 @@ test("mounted settings captures without app dispatch, rejects conflicts, changes
     await press("x", { shiftKey: true });
     assert.equal(field.value, "Shift+X"); assert.equal(changes, 1); assert.equal(actions, 0);
     await press("k"); assert.equal(changes, 1);
-    assert.match(dom.window.document.querySelector('[role="status"]')!.textContent!, /Already used/);
+    assert.match(dom.window.document.querySelector('[role="alert"]')!.textContent!, /Already used/);
     await act(async () => dom.window.document.querySelector<HTMLButtonElement>('[aria-label="Record sequence for Next email"]')!.click());
     await press("z"); await press("x");
     assert.equal(field.value, "Z then X"); assert.equal(changes, 2);

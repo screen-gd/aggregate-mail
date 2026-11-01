@@ -1,3 +1,4 @@
+import { Notice } from "../ui/Toasts";
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Account, RendererMail } from "../../shared/types";
 import { MAX_MAIL_BATCH, type BulkMailAction, type MailBatchResponse, type MailBatchResult, type MailIdentity } from "../../shared/bulk-mail";
@@ -160,7 +161,10 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
       {active && railSelect && createPortal(master, railSelect)}
       {active && railActions && createPortal(triage, railActions)}
       {active && (!railSelect || !railActions) && <div className="bulk-bar">{!railSelect && master}{!railActions && triage}</div>}
-      {active && outcome && <div className="bulk-result" role="status">
+      {active && outcome && (outcome.results.every(item => item.status === "done") && !outcome.refreshFailed
+        ? <Notice text={`${outcome.results.length} messages updated.`} kind="success" />
+        : <><Notice text={`${outcome.results.filter(item => item.status === "done").length} done, ${outcome.results.filter(item => item.status === "failed").length} failed, ${outcome.results.filter(item => item.status === "unknown").length} unknown.${outcome.refreshFailed ? " Refreshing mail failed." : ""} Review action results before trying again.`} />
+        <details className="bulk-result"><summary>Review action results</summary>
         <p>{outcome.results.filter(item => item.status === "done").length} done, {outcome.results.filter(item => item.status === "failed").length} failed, {outcome.results.filter(item => item.status === "unknown").length} unknown.</p>
         {outcome.results.some(item => item.status !== "done") && <>
           <p>Failed items were not applied. Check your provider and sync before acting on unknown items. No actions were retried.</p>
@@ -171,7 +175,7 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
         </>}
         {outcome.refreshFailed && <p>Refreshing mail failed. Refresh separately to check the cache.</p>}
         <button className="button" onClick={() => setOutcome(null)}>Dismiss results</button>
-      </div>}
+      </details></>)}
       <div inert={pending || !!confirmation || snoozing}>{children}</div>
       {confirmation && createPortal(<Dialog title="Move messages to Trash" onClose={() => setConfirmation(null)}>
         <p>Move exactly {confirmation.length} messages to Trash? Recovery depends on your provider.</p>

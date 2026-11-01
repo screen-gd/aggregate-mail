@@ -21,6 +21,10 @@ unversioned history without treating it as a release record.
 ### Changed
 
 - Use the closing brand image for website link previews, replacing the old inbox screenshot with the Emc² logo and “Email at the speed of light. Inbox, weightless.” ([#190](https://github.com/collection-of-things/aggregate-mail/pull/190))
+- On phones, swipe right for Back and left for Forward, or swipe a notification to dismiss it. Turn navigation swipes off in Keyboard and mouse settings. Scrolling, zoom, form controls and browser edge gestures retain their normal behavior. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
+- Remove repeated page descriptions and form coaching. Search options opens help and older-mail search on demand; operation errors and results use the notification stack. Browser notifications can chime after interaction and respect Sound off. Approval and recovery controls remain available. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
 - Choose a full-width reader toolbar in Appearance: combine categories and action icons, show actions only, or keep two rows. The choice is saved and works in narrow windows too. Inactive Inbox tabs show their icon and unread count; the active tab keeps its full name. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 
 - Use the full Emc² logo, including its symbol, in the sidebar and sign-in pages, with matching app icons for browser shortcuts and desktop icon formats. Light and dark logos follow the interface appearance. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))

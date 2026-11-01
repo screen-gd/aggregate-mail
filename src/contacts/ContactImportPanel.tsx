@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useContext, useRef, useState } from "react";
 import type { ContactImport, ContactImportPreview } from "../../shared/contacts";
 import type { Account } from "../../shared/types";
@@ -23,8 +24,8 @@ export function ContactImportPanel({ api, accounts, accountFilter, busy, onImpor
   const [input, setInput] = useState<ContactImport>();
   const [preview, setPreview] = useState<ContactImportPreview>();
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const [status, setStatus] = useState("");
+  const [error, setError] = useFeedbackState();
+  const [status, setStatus] = useFeedbackState("success");
   const lock = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const disabled = busy || pending;
@@ -80,6 +81,6 @@ export function ContactImportPanel({ api, accounts, accountFilter, busy, onImpor
         <div className="contacts-actions"><button type="button" className="button" disabled={disabled || !preview.added} onClick={() => void importFile()}>Import {preview.added} contacts</button><button type="button" className="button" disabled={disabled} onClick={reset}>Cancel import</button></div>
       </div>}
     </div></div>
-    {error && <p role="alert">{error}</p>}{status && <p role="status">{status}</p>}
+    {error && <Notice text={error} />}{status && <Notice text={status} kind="success" />}
   </section>;
 }

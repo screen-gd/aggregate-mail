@@ -1434,6 +1434,15 @@ Find pinned mail is a cached `is:pinned` search, not a separate state. The Filte
 
 The service increments an in-memory `unreadArrivals` count only for arrivals already accepted by its existing sync notification rules. App suppresses its initial snapshot and reports newly accepted arrival sequences on later reloads. The service retains a bounded in-memory journal of exact IDs and sanitized details, pruning removed mail while preserving surviving sequence numbers and the cumulative count. Legacy count-only snapshots use generic notices. Repeated state reads do not repeat a notice; the service counter resets on restart. Each observed arrival batch gets a distinct event ID so equal-sized batches keep separate notices. `src/ui/Toasts.tsx` retains queued outcomes, renders four at a time, masks text with Redact and pauses informational expiry during hover/focus. Errors and delivery warnings remain until dismissed. This supplements native notifications; it does not introduce another sync loop.
 
+Page feedback uses `Notice` and `NotificationProvider` in `src/ui/Toasts.tsx`.
+The provider reuses the existing queue and privacy redaction. `Dialog` registers
+a notification host while open; nested dialogs use the latest host and restore
+the previous one on close. Errors survive page changes and remain until dismissed.
+Field descriptions keep their IDs without a visible error paragraph. Browser
+audio is unlocked by a gesture, coalesces notices within half a second, and
+respects the existing sound preference; unavailable audio leaves text unaffected.
+Desktop audio is unchanged. Physical browser audio remains separate acceptance.
+
 Settings, Notifications customizes floating in-app arrivals and action confirmations independently. Position can be Bottom right, Bottom center or Top right; duration can be 3, 6 or 10 seconds or Until dismissed. Defaults enable both categories at Bottom right for six seconds. Preview works with both categories disabled, and reset restores defaults. Validated display preferences use the `emc2.notifications.v1` localStorage key. Duration changes apply to future notices; queued and visible notices retain their original duration. Storage failure keeps the current selection in memory and reports the save failure. Errors and uncertain-send warnings cannot be disabled or timed out by these choices. Independent desktop delivery, optional sender/subject/preview details, exact-email opening and system/off/custom audio extend these preferences. All details default off and remain generic in privacy mode. A native chooser imports regular WAV/MP3/Ogg files up to 2 MiB, storing bytes without the source path or name. Playback stops after 30 seconds. Reset removes imported audio. See [ADR 0040](adr/0040-customizable-in-app-notifications.md) and [ADR 0050](adr/0050-notification-details-and-local-audio.md).
 
 Snooze confirms the selected local return date and time. Return to inbox, Archive and Trash also produce success confirmations. Success follows the confirmed action, before refreshing the cache. A subsequent refresh failure reports the confirmed result with a separate refresh warning, rather than suggesting the action failed or should be repeated. Mounted synthetic action and notification tests cover these outcomes; physical input, native appearance and live-provider delivery are separate proof.
@@ -1676,6 +1685,16 @@ search edits share one visit. Back from an open reader returns to the list; imme
 Missing account filters return to All. Drafts and dialogs block traversal.
 Escape retains the existing close-email, close-dialog and draft-confirmation
 behavior. Closing or changing the reader clears remote-image consent.
+
+Phone browsers below 760px use `src/ui/useSwipe.ts` for Back/Forward in the
+main content pane. The `touchNavigation` interaction preference defaults on
+and persists per browser. A single-finger horizontal swipe must travel 64px
+within 700ms. Vertical movement cancels recognition before scrolling is
+intercepted. Controls, text selection, horizontal scrollers, pinch zoom and
+browser edges remain native. Dialogs, compose, busy work and an open sidebar
+block navigation. Notifications use the same recognizer for dismissal.
+`src/touch-gestures.test.tsx` and mounted navigation/toast checks cover these
+paths synthetically; physical phone gesture acceptance remains separate.
 
 On Windows and Linux, [Electron main](../desktop/main.ts) forwards the
 documented `app-command` values `browser-backward` and `browser-forward`

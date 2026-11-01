@@ -65,7 +65,7 @@ test("mounted Offer times saves a reviewed reply, recovers lost responses and bo
     await set("IANA time zone", "UTC"); await click(button("Save availability")); await settle(() => !button("Save availability").matches(":disabled"));
     await set("First offered day", day); await set("Last offered day", day);
     const googleCheckbox = [...container.querySelectorAll<HTMLLabelElement>(".offer-times label")].find((label) => label.textContent === "Private Reader calendar")!.querySelector<HTMLInputElement>("input")!;
-    await click(googleCheckbox); await click(button("Check free times")); await settle(() => /needs consent/.test(container.querySelector(".offer-times")!.textContent!)); assert.equal(store.all("calendarOffer").length, 0);
+    await click(googleCheckbox); await click(button("Check free times")); await settle(() => /needs consent/.test(container.querySelector('[role="alert"]')?.textContent ?? "")); assert.equal(store.all("calendarOffer").length, 0);
     await click(button("Change rejected check"));
     assert.equal(field("First offered day").matches(":disabled"), false);
     await set("First offered day", day); await set("Last offered day", day);

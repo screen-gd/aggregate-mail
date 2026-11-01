@@ -420,6 +420,13 @@ The composer groups From, To and optional Cc above the subject and body.
 Attachments and save/recovery status remain visible above a sticky action
 footer. Keep draft, Discard draft and Send retain their existing safeguards.
 
+Phone browser swipes use the existing history: right goes Back and left goes
+Forward. Keyboard and mouse settings can disable navigation swipes. Swipes ignore
+controls, selected text, horizontal scrollers, zoomed pages and the outer
+24px browser edges. Navigation is blocked during dialogs, compose and busy
+work. Notifications support horizontal swipe dismissal through their existing
+close action, with no additional page instructions.
+
 macOS horizontal navigation gestures use the existing back/forward history.
 Vertical gestures retain ordinary scrolling. Dialog, compose and busy guards
 apply to gesture navigation too.
@@ -560,7 +567,8 @@ select ranges. Escape clears selection. Platform select-all selects the filtered
 list, including virtual rows, up to 200. Fields, dialogs and readers keep native
 select-all. View changes clear selection. The batch bar names the count and
 accounts; Trash confirms the captured count once. Per-message outcomes remain
-visible after selection clears, including partial and unknown results.
+available after selection clears. Partial and unknown results send an error
+notification and retain a results disclosure.
 
 ## Inline conversation reader
 
@@ -609,3 +617,21 @@ Import presents three steps: export from a provider, choose a destination
 account, then preview and confirm. Preview names and addresses use the existing
 privacy controls. Counts explain new, existing and skipped addresses. Success
 appears only after the service confirms the write.
+
+## Quiet page feedback
+
+Use one heading per section. Do not repeat the section purpose below it or add
+paragraphs explaining labeled controls. Put optional setup and format details
+behind named disclosures. Keep required permission, destructive-action and
+uncertain-outcome decisions beside their controls.
+
+Search scope remains available to assistive technology. Search options opens
+syntax help and explicit older-mail search. Page errors and operation results
+use the shared notification stack. The stack moves inside the active dialog so
+its messages and dismissal controls stay in the modal accessibility scope.
+Keep field description IDs and local retry controls. Successful bulk operations
+use notifications; incomplete results retain a Review action results disclosure.
+
+Browser notifications use a short chime after a user gesture when Chime is selected.
+Sound off is silent; blocked audio never blocks a notice. Desktop new-mail sound
+and custom audio keep their existing behavior.

@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import type { RendererMail as Mail } from "../../shared/types";
 import { ContextMenu } from "../ui/ContextMenu";
@@ -18,7 +19,7 @@ export function SnoozeMenu({ mail, x, y, anchor, busy, onSnooze, onUnsnooze, onC
   // An active snooze opens the custom field on its return time; a new snooze keeps tomorrow at 9:00.
   const snoozedUntil = mail.snoozedUntil !== null && mail.snoozedUntil > now ? mail.snoozedUntil : null;
   const [custom, setCustom] = useState(snoozedUntil !== null);
-  const [error, setError] = useState("");
+  const [error, setError] = useFeedbackState();
   const input = useRef<HTMLInputElement>(null);
   useLayoutEffect(() => { if (custom) input.current?.focus(); }, [custom]);
   const choices = [
@@ -52,7 +53,7 @@ export function SnoozeMenu({ mail, x, y, anchor, busy, onSnooze, onUnsnooze, onC
       <input ref={input} type="datetime-local" aria-label="Snooze until"
         min={localValue(new Date(Date.now()))} defaultValue={localValue(defaultTime)} />
       <button type="submit" className="button" disabled={busy}>Snooze</button>
-      {error && <p role="alert">{error}</p>}
+      {error && <Notice text={error} />}
     </form>}
   </ContextMenu>;
 }

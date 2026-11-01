@@ -45,7 +45,7 @@ test("cross-month Google coverage stays visible and each Sync uses its exact exi
     await act(async()=>root.render(<GoogleCalendar state={state} calendar={calendar} api={api} months={["2026-10","2026-11"]} accountFilter="all"/>));
     assert.equal(calls.length,0);
     const warning = [...document.querySelectorAll('[role="status"]')].find(element=>element.textContent?.includes("coverage is incomplete"));
-    assert.ok(warning);assert.equal(warning.closest("details"),null,"coverage warning remains outside the collapsed disclosure");
+    assert.ok(warning);assert.equal(warning.closest("details")?.className,"google-calendar","coverage details open on request; summary keeps the warning visible");
     assert.match(document.querySelector("summary")!.textContent!,/Coverage incomplete/);
     assert.match(document.querySelectorAll(".google-calendar-month")[1].textContent!,/Cache read failed/);
     for (const month of ["2026-11","2026-10"]) {

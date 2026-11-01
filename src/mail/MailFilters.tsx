@@ -109,7 +109,7 @@ export function MailFilters({ open, active, location, labels, accounts, blocked,
             <button type="button" className="link" disabled={blocked} aria-label="Find pinned mail in All cached"
               onClick={() => onFindPinned("all")}>All cached</button>
           </div>
-          <p className="pinned-help">Pin keeps mail for reference. Snooze brings it back later. Track records work.</p>
+
           {showReset && <button type="button" className="link filter-reset" disabled={blocked}
             onClick={onReset}>Reset filters and sort</button>}
         </div>

@@ -1,3 +1,4 @@
+import { Notice, useFeedbackState } from "../ui/Toasts";
 import { ScheduleTime } from "./ScheduleTime";
 import { followUpPreset } from "../../shared/follow-up-presets";
 import { ATTACHMENT_BYTES, ATTACHMENT_COUNT, attachmentSize } from "../../shared/attachments";
@@ -144,7 +145,7 @@ export function ComposePanel({
     };
   }, []);
 
-  const [attachmentError, setAttachmentError] = useState("");
+  const [attachmentError, setAttachmentError] = useFeedbackState();
   const [loadingFiles, setLoadingFiles] = useState(false);
   const filesBusy = useRef(false);
   const [dragging, setDragging] = useState(false);
@@ -276,7 +277,7 @@ export function ComposePanel({
         <RichBody draft={draft} disabled={busy || loadingFiles} onChange={setDraft} />
         <div className="compose-extras">
           {(draft.attachments || []).map((file, index) => <p className="compose-attachment" key={index}><Redact text={file.filename} /> ({attachmentSize(file)} bytes) <button type="button" disabled={busy || loadingFiles} aria-label={`Remove attachment ${index + 1}`} onClick={() => setDraft({ ...draft, attachments: draft.attachments?.filter((_, i) => i !== index) })}>Remove</button></p>)}
-          {attachmentError && <p role="alert">{attachmentError}</p>}
+          {attachmentError && <Notice text={attachmentError} />}
           {loadingFiles && <p role="status">Uploading attachments…</p>}
           <ComposePreferenceControls draft={draft} preferences={preferences} busy={busy || loadingFiles} onChange={setDraft} />
           {onUndoDelay && <div className="compose-undo-delay"><span>Undo delay</span><Dropdown label="Undo send delay"
