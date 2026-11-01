@@ -21,6 +21,11 @@ const text = z.string().max(1000000);
 const id = z.string().min(1).max(2000);
 const time = z.number().int().nonnegative().max(253402300799999);
 const ids = z.array(id).max(10000);
+// Reference remapping walks each identifier once. Cap the aggregate work an
+// accepted backup can request before the synchronous transformation starts.
+const MAX_REFERENCE_CHARS = 8_000_000;
+const MAX_ACCOUNT_ID_CHARS = 200_000;
+type PrefixNode = { next: Map<string, PrefixNode>; index?: number };
 const status = z.enum(["needs-reply", "needs-work", "waiting", "done", "cancelled"]);
 const deadline = { dueAt: time.optional(), dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), followUpAt: time.optional() };
 const history = z.object({ at: time, status, ...deadline, reason: text, text, evidenceMailIds: ids });
@@ -147,7 +152,7 @@ export async function openBackup(file: unknown, password: unknown): Promise<Payl
   }
 }
 
-// Rebind only typed identity/reference fields, never user-authored text.
+/** Rebind typed identities and mail references, preserving user-authored text. */
 function prepare(payload: Payload) {
   const accounts = all("account");
   const mapping = new Map<string, string>();
@@ -157,14 +162,29 @@ function prepare(payload: Payload) {
   }
   const accountId = (source: string) => mapping.get(source) ?? source;
   // Account ids may contain ':'; the first listed account whose id prefixes the
-  // reference wins, matching the original sequential find. Colon positions keep
-  // each lookup to the few candidates a reference can name.
-  const accountIndexes = new Map(payload.accounts.map((source, index) => [source.id, index]));
+  // reference wins, matching the original sequential find. A trie finds matching
+  // prefixes in one forward pass without rescanning at every colon position.
+  if (payload.accounts.reduce((total, source) => total + source.id.length, 0) > MAX_ACCOUNT_ID_CHARS)
+    throw Error("Backup account identifiers exceed safe limits. Nothing was imported.");
+  const trie: PrefixNode = { next: new Map() };
+  for (const [index, source] of payload.accounts.entries()) {
+    let node = trie;
+    for (let at = 0; at < source.id.length; at++) {
+      let child = node.next.get(source.id[at]);
+      if (!child) { child = { next: new Map() }; node.next.set(source.id[at], child); }
+      node = child;
+    }
+    if (node.index === undefined) node.index = index;
+  }
+  let referenceChars = 0;
   const mailId = (source: string) => {
-    let best: number | undefined;
-    for (let colon = source.indexOf(":"); colon >= 0; colon = source.indexOf(":", colon + 1)) {
-      const index = accountIndexes.get(source.slice(0, colon));
-      if (index !== undefined && (best === undefined || index < best)) best = index;
+    referenceChars += source.length;
+    if (referenceChars > MAX_REFERENCE_CHARS) throw Error("Backup references exceed safe limits. Nothing was imported.");
+    let node: PrefixNode | undefined = trie, best: number | undefined;
+    for (let at = 0; at < source.length; at++) {
+      node = node.next.get(source[at]);
+      if (!node) break;
+      if (node.index !== undefined && source.charCodeAt(at + 1) === 58 && (best === undefined || node.index < best)) best = node.index;
     }
     const original = best === undefined ? undefined : payload.accounts[best];
     return original ? `${accountId(original.id)}:${source.slice(original.id.length + 1)}` : source;

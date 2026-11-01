@@ -123,6 +123,114 @@ test("encrypted workspace backup and non-destructive restore, synthetic only", {
     store.put("mail", "b:1", { ...store.get("mail", "b:1")!, pinned: false, snoozedUntil: null });
     assert.equal(store.get("mail", "b:1")!.pinned, false, "later local edits preserved");
   });
+  await t.test("account prefix remapping resolves the first listed exact account", () => {
+    store.remove("commitment", "c");
+    store.put("account", "prefix", { id: "prefix", email: "prefix@example.test", provider: "imap", credentials: {} });
+    const ambiguous = structuredClone(payload);
+    ambiguous.accounts = [
+      { id: "a:b", email: "prefix@example.test", provider: "imap" },
+      { id: "a", email: synthetic.email, provider: "imap" },
+    ];
+    const row = ambiguous.records.find(candidate => candidate.kind === "commitment")!;
+    row.value = { ...(row.value as object), sourceMailId: "a:b:1", evidenceMailIds: ["a:b:1"] };
+    backup.mergeBackup(ambiguous, true);
+    assert.equal(store.get("commitment", "c")!.sourceMailId, "prefix:1");
+    assert.deepEqual(store.get("commitment", "c")!.evidenceMailIds, ["prefix:1"]);
+    store.remove("commitment", "c");
+    store.remove("account", "prefix");
+  });
+  await t.test("reordered accounts keep the first listed prefix", () => {
+    store.remove("commitment", "c");
+    store.put("account", "prefix", { id: "prefix", email: "prefix@example.test", provider: "imap", credentials: {} });
+    const reordered = structuredClone(payload);
+    reordered.accounts = [
+      { id: "a", email: synthetic.email, provider: "imap" },
+      { id: "a:b", email: "prefix@example.test", provider: "imap" },
+    ];
+    const row = reordered.records.find(candidate => candidate.kind === "commitment")!;
+    row.value = { ...(row.value as object), sourceMailId: "a:b:1", evidenceMailIds: ["a:b:1"] };
+    backup.mergeBackup(reordered, true);
+    assert.equal(store.get("commitment", "c")!.sourceMailId, "b:b:1");
+    assert.deepEqual(store.get("commitment", "c")!.evidenceMailIds, ["b:b:1"]);
+    store.remove("commitment", "c");
+    store.remove("account", "prefix");
+  });
+  await t.test("Unicode prefixes remap and unknown references stay unchanged", () => {
+    store.remove("commitment", "c");
+    store.put("account", "unicode", { id: "unicode", email: "unicode@example.test", provider: "imap", credentials: {} });
+    const unicode = structuredClone(payload);
+    unicode.accounts = [
+      { id: "a", email: synthetic.email, provider: "imap" },
+      { id: "méil", email: "unicode@example.test", provider: "imap" },
+    ];
+    const row = unicode.records.find(candidate => candidate.kind === "commitment")!;
+    row.value = { ...(row.value as object), sourceMailId: "méil:7", evidenceMailIds: ["méil:7", "unknown:9"] };
+    backup.mergeBackup(unicode, true);
+    const saved = store.get("commitment", "c")!;
+    assert.equal(saved.sourceMailId, "unicode:7");
+    assert.deepEqual(saved.evidenceMailIds, ["unicode:7", "unknown:9"]);
+    store.remove("commitment", "c");
+    store.remove("account", "unicode");
+  });
+  await t.test("colon-heavy references remap across typed fields on preview and restore", () => {
+    store.put("account", "prefix", { id: "prefix", email: "prefix@example.test", provider: "imap", credentials: {} });
+    const source = `a:branch:${"part:".repeat(100)}mail`;
+    const destination = `b:${"part:".repeat(100)}mail`;
+    const unknown = `unknown:${"part:".repeat(100)}mail`;
+    const incoming = structuredClone(payload);
+    incoming.accounts = [
+      { id: "a:branch", email: synthetic.email, provider: "imap" },
+      { id: "a", email: "prefix@example.test", provider: "imap" },
+    ];
+    const included = ["project", "decision", "rule", "proposal", "workspaceMailState"];
+    incoming.records = incoming.records.filter(row => included.includes(row.kind));
+    for (const row of incoming.records) {
+      row.id = row.kind === "workspaceMailState" ? source : `colon-${row.kind}`;
+      row.value = { ...(row.value as object), id: row.id };
+      if (row.kind === "project") row.value = { ...(row.value as object), accountIds: ["a:branch"], sourceMailIds: [source, unknown], name: source };
+      if (row.kind === "decision") row.value = { ...(row.value as object), projectId: "colon-project", sourceMailIds: [source, unknown] };
+      if (row.kind === "rule") row.value = { ...(row.value as object), accountId: "a:branch", excludedMailIds: [source, unknown] };
+      if (row.kind === "proposal") row.value = { ...(row.value as object), accountId: "a:branch", sourceMailId: source, payload: { mailId: source } };
+      if (row.kind === "workspaceMailState") row.value = { ...(row.value as object), accountId: "a:branch" };
+    }
+    incoming.manifest.counts = Object.fromEntries(Object.keys(payload.manifest.counts).map(kind => [kind, incoming.records.filter(row => row.kind === kind).length]));
+    try {
+      const preview = backup.mergeBackup(incoming);
+      assert.equal(preview.missingAccounts, 0);
+      for (const kind of included) assert.equal(preview.added[kind], 1, kind);
+      assert.equal(store.get("project", "colon-project"), undefined);
+      assert.equal(store.get("workspaceMailState", destination), undefined);
+      backup.mergeBackup(incoming, true);
+      assert.deepEqual(store.get("project", "colon-project")!.sourceMailIds, [destination, unknown]);
+      assert.deepEqual(store.get("project", "colon-project")!.accountIds, ["b"]);
+      assert.equal(store.get("project", "colon-project")!.name, source);
+      assert.deepEqual(store.get("decision", "colon-decision")!.sourceMailIds, [destination, unknown]);
+      assert.deepEqual(store.get("rule", "colon-rule")!.excludedMailIds, [destination, unknown]);
+      assert.equal(store.get("rule", "colon-rule")!.accountId, "b");
+      assert.equal(store.get("proposal", "colon-proposal")!.sourceMailId, destination);
+      assert.deepEqual(store.get("proposal", "colon-proposal")!.payload, { mailId: destination });
+      assert.equal(store.get("proposal", "colon-proposal")!.status, "unknown");
+      assert.equal(store.get("workspaceMailState", destination)!.accountId, "b");
+      assert.equal(store.get("workspaceMailState", destination)!.id, destination);
+    } finally {
+      for (const kind of ["project", "decision", "rule", "proposal"] as const) store.remove(kind, `colon-${kind}`);
+      store.remove("workspaceMailState", destination);
+      store.remove("account", "prefix");
+    }
+  });
+  await t.test("oversized identifiers fail before prefix work becomes unbounded", () => {
+    const wide = structuredClone(payload);
+    wide.accounts = Array.from({ length: 101 }, (_, index) => ({
+      id: String(index).padStart(3, "0") + "x".repeat(1997),
+      email: `synthetic-${index}@example.test`,
+      provider: "imap" as const,
+    }));
+    assert.throws(() => backup.mergeBackup(wide), /account identifiers exceed/);
+    const many = structuredClone(payload);
+    const project = many.records.find(row => row.kind === "project")!;
+    project.value = { ...(project.value as object), sourceMailIds: Array.from({ length: 5000 }, () => "a:" + "x".repeat(1998)) };
+    assert.throws(() => backup.mergeBackup(many), /references exceed safe limits/);
+  });
   await t.test("write failure rolls back the entire merge", () => {
     store.remove("commitment", "c"); store.remove("project", "p");
     const db = new DatabaseSync(path.join(directory, "mail.sqlite"));

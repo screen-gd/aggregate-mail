@@ -85,6 +85,14 @@ public class MailTransportTest {
         assertThrows(java.io.IOException.class, () -> drain("* 1 FETCH (BODY[] {1048577}\r\n"));
         assertThrows(java.io.IOException.class, () -> drain("* 1 FETCH (BODY[] {4}\r\nabcd {1048577+}\r\n"));
     }
+    @Test public void boundsServerMessageCountBeforeMailboxAllocation() throws Exception {
+        assertThrows(java.io.IOException.class, () -> drain("* 100001 EXISTS\r\n"));
+        assertThrows(java.io.IOException.class, () -> drain("* 9999999999 EXISTS\r\n"));
+        drain("* 100 EXISTS\r\n");
+        // A payload that looks like an announcement must not trip the bound.
+        String fake = "* 100001 EXISTS\r\n";
+        drain("* 1 FETCH (BODY[] {" + fake.length() + "}\r\n" + fake + ")\r\n");
+    }
     @Test public void missingMultipartBoundaryFailsBeforeParsing() throws Exception {
         assertThrows(Exception.class, () -> MailTransport.body(message("Content-Type: multipart/mixed\r\n\r\n--" + "x".repeat(10000)), 0, new int[]{0}));
         assertEquals("hello", MailTransport.body(message("Content-Type: multipart/mixed; boundary=x\r\n\r\n--x\r\nContent-Type: text/plain\r\n\r\nhello\r\n--x--\r\n"), 0, new int[]{0}).text);
