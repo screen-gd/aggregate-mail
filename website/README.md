@@ -119,7 +119,7 @@ counterpart that loads only once the dark theme shows.
 - `src/assets/art/` - the three paintings and their night counterparts.
 - `SITE_URL` in the environment sets the canonical origin at build time
   (canonical link and og:url; without it, social cards point at the
-  committed og.png on the main branch).
+  committed og.jpg on the main branch).
 
 ## Artwork
 
@@ -137,11 +137,17 @@ Keep the credits in the footer when changing them.
 
 ## Social image and icons
 
-`public/og.png` (1200x630) is a headless-browser capture of the hero inbox
-window on black, made once from a temporary page and committed. The favicon
-set (`favicon.ico`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`)
-and `site.webmanifest` are rendered from `favicon.svg` with sharp; the
-apple-touch-icon renders with square corners because iOS rounds it itself.
+`public/og.jpg` (3200x1800) is the approved closing brand image, with the
+Emc² logo and “Email at the speed of light. Inbox, weightless.” on a pink
+and purple background. Open Graph, Twitter cards and structured data share
+its URL; both card formats include descriptive alt text. When `SITE_URL` is
+set, the URL points to that site's `/og.jpg`; otherwise it uses the committed
+image on the main branch.
+
+The favicon set (`favicon.ico`, `apple-touch-icon.png`, `icon-192.png`,
+`icon-512.png`) and `site.webmanifest` are rendered from `favicon.svg` with
+sharp; the apple-touch-icon renders with square corners because iOS rounds
+it itself.
 
 ## Provider marks
 

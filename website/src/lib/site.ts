@@ -10,5 +10,5 @@ export const DESCRIPTION =
 // committed image on the main branch.
 export const ogImageUrl = (site: URL | undefined) =>
   site
-    ? new URL("/og.png", site).href
-    : "https://raw.githubusercontent.com/collection-of-things/aggregate-mail/main/website/public/og.png";
+    ? new URL("/og.jpg", site).href
+    : "https://raw.githubusercontent.com/collection-of-things/aggregate-mail/main/website/public/og.jpg";
