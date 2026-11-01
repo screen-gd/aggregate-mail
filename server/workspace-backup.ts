@@ -152,7 +152,7 @@ export async function openBackup(file: unknown, password: unknown): Promise<Payl
   }
 }
 
-// Rebind only typed identity/reference fields, never user-authored text.
+/** Rebind typed identities and mail references, preserving user-authored text. */
 function prepare(payload: Payload) {
   const accounts = all("account");
   const mapping = new Map<string, string>();
@@ -162,9 +162,8 @@ function prepare(payload: Payload) {
   }
   const accountId = (source: string) => mapping.get(source) ?? source;
   // Account ids may contain ':'; the first listed account whose id prefixes the
-  // reference wins, matching the original sequential find. A trie resolves the
-  // longest matching prefix of each reference in one forward pass, so a crafted
-  // identifier cannot make every colon position rescan overlapping prefixes.
+  // reference wins, matching the original sequential find. A trie finds matching
+  // prefixes in one forward pass without rescanning at every colon position.
   if (payload.accounts.reduce((total, source) => total + source.id.length, 0) > MAX_ACCOUNT_ID_CHARS)
     throw Error("Backup account identifiers exceed safe limits. Nothing was imported.");
   const trie: PrefixNode = { next: new Map() };

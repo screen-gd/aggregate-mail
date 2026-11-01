@@ -50,6 +50,7 @@ final class MailTransport {
             for (int i = 0; i < count; i++) guard(buffer[offset + i]);
             return count;
         }
+        /** Bound response and literal sizes while passing non-literal bytes to the EXISTS guard. */
         private void guard(byte b) throws java.io.IOException {
             if (++responseBytes > 2 * MAX_LITERAL) throw new java.io.IOException("Mail server response exceeds safe limits.");
             if (remaining > 0) { remaining--; return; }

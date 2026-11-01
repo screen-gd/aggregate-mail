@@ -69,6 +69,7 @@ function cleanLegacy(text: string, cleaned: string) {
   catch (error) { unlinkSync(temporary); throw error; }
 }
 
+/** Load saved settings, respecting launch overrides and the credential's provider. */
 export function loadConfiguration() {
   const legacy = legacySettings();
   const cleaned = withoutManagedSettings(legacy.text, legacy.values);
@@ -91,6 +92,7 @@ export function loadConfiguration() {
   }
 }
 
+/** Save settings after checking provider and credential pairing under launch precedence. */
 export function saveConfiguration(updates: Settings) {
   const legacy = legacySettings();
   const cleaned = withoutManagedSettings(legacy.text, legacy.values);

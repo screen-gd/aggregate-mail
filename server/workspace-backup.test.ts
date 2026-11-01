@@ -172,6 +172,52 @@ test("encrypted workspace backup and non-destructive restore, synthetic only", {
     store.remove("commitment", "c");
     store.remove("account", "unicode");
   });
+  await t.test("colon-heavy references remap across typed fields on preview and restore", () => {
+    store.put("account", "prefix", { id: "prefix", email: "prefix@example.test", provider: "imap", credentials: {} });
+    const source = `a:branch:${"part:".repeat(100)}mail`;
+    const destination = `b:${"part:".repeat(100)}mail`;
+    const unknown = `unknown:${"part:".repeat(100)}mail`;
+    const incoming = structuredClone(payload);
+    incoming.accounts = [
+      { id: "a:branch", email: synthetic.email, provider: "imap" },
+      { id: "a", email: "prefix@example.test", provider: "imap" },
+    ];
+    const included = ["project", "decision", "rule", "proposal", "workspaceMailState"];
+    incoming.records = incoming.records.filter(row => included.includes(row.kind));
+    for (const row of incoming.records) {
+      row.id = row.kind === "workspaceMailState" ? source : `colon-${row.kind}`;
+      row.value = { ...(row.value as object), id: row.id };
+      if (row.kind === "project") row.value = { ...(row.value as object), accountIds: ["a:branch"], sourceMailIds: [source, unknown], name: source };
+      if (row.kind === "decision") row.value = { ...(row.value as object), projectId: "colon-project", sourceMailIds: [source, unknown] };
+      if (row.kind === "rule") row.value = { ...(row.value as object), accountId: "a:branch", excludedMailIds: [source, unknown] };
+      if (row.kind === "proposal") row.value = { ...(row.value as object), accountId: "a:branch", sourceMailId: source, payload: { mailId: source } };
+      if (row.kind === "workspaceMailState") row.value = { ...(row.value as object), accountId: "a:branch" };
+    }
+    incoming.manifest.counts = Object.fromEntries(Object.keys(payload.manifest.counts).map(kind => [kind, incoming.records.filter(row => row.kind === kind).length]));
+    try {
+      const preview = backup.mergeBackup(incoming);
+      assert.equal(preview.missingAccounts, 0);
+      for (const kind of included) assert.equal(preview.added[kind], 1, kind);
+      assert.equal(store.get("project", "colon-project"), undefined);
+      assert.equal(store.get("workspaceMailState", destination), undefined);
+      backup.mergeBackup(incoming, true);
+      assert.deepEqual(store.get("project", "colon-project")!.sourceMailIds, [destination, unknown]);
+      assert.deepEqual(store.get("project", "colon-project")!.accountIds, ["b"]);
+      assert.equal(store.get("project", "colon-project")!.name, source);
+      assert.deepEqual(store.get("decision", "colon-decision")!.sourceMailIds, [destination, unknown]);
+      assert.deepEqual(store.get("rule", "colon-rule")!.excludedMailIds, [destination, unknown]);
+      assert.equal(store.get("rule", "colon-rule")!.accountId, "b");
+      assert.equal(store.get("proposal", "colon-proposal")!.sourceMailId, destination);
+      assert.deepEqual(store.get("proposal", "colon-proposal")!.payload, { mailId: destination });
+      assert.equal(store.get("proposal", "colon-proposal")!.status, "unknown");
+      assert.equal(store.get("workspaceMailState", destination)!.accountId, "b");
+      assert.equal(store.get("workspaceMailState", destination)!.id, destination);
+    } finally {
+      for (const kind of ["project", "decision", "rule", "proposal"] as const) store.remove(kind, `colon-${kind}`);
+      store.remove("workspaceMailState", destination);
+      store.remove("account", "prefix");
+    }
+  });
   await t.test("oversized identifiers fail before prefix work becomes unbounded", () => {
     const wide = structuredClone(payload);
     wide.accounts = Array.from({ length: 101 }, (_, index) => ({

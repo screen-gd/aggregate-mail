@@ -21,8 +21,7 @@ const personal = /verification|verify|one[- ]time|\botp\b|passcode|security (ale
 // Heuristics only read this much of a subject or preview; display keeps all of it.
 const classifyTextLimit = 4096;
 const digit = (value: string, at: number) => value.charCodeAt(at) >= 48 && value.charCodeAt(at) <= 57;
-// `(reset|change|forgot)\w* (your )?password` and `password (reset|change)` in
-// linear time: each "password" occurrence inspects one bounded window.
+/** Detect password notices by inspecting a bounded window around each occurrence. */
 const passwordNotice = (value: string) => {
   const text = value.toLowerCase();
   for (let at = text.indexOf("password"); at >= 0; at = text.indexOf("password", at + 8)) {
