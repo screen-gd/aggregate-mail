@@ -248,17 +248,17 @@ export function SettingsPage({
           )}
         </section>}
         {section === "connection" && <section>
-          <p className="note">
-            {state.googleConfigured ? "Google sign-in setup is saved. Connect an account under Accounts."
-              : "Google sign-in needs an OAuth client from Google Cloud. Gmail with an app password connects under Accounts without this setup, if Google permits it."}
-          </p>
-          <p className="note">
-            Sorting keys are optional. Jev uses the selected decision model provider; OpenAI is used when no Jev key is saved.
-            AI sorting sends sender, subject and preview text to its provider. OpenAI also receives cached message content and metadata.
-            Without a key, sorting stays local.
-          </p>
           <details className="settings-group settings-details">
             <summary>Google setup and sorting keys</summary>
+            <p className="note">
+              {state.googleConfigured ? "Google sign-in setup is saved. Connect an account under Accounts."
+                : "Google sign-in needs an OAuth client from Google Cloud. Gmail with an app password connects under Accounts without this setup, if Google permits it."}
+            </p>
+            <p className="note">
+              Sorting keys are optional. Jev uses the selected decision model provider; OpenAI is used when no Jev key is saved.
+              AI sorting sends sender, subject and preview text to its provider. OpenAI also receives cached message content and metadata.
+              Without a key, sorting stays local.
+            </p>
             {!state.googleConfigured && (
               <div className="setup">
                 <ol>

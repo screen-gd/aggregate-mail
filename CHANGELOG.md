@@ -43,6 +43,8 @@ unversioned history without treating it as a release record.
 
 ### Fixed
 
+- Keep phone Contacts navigation compact, preserve horizontal Settings switches and round accent choices, and separate Agent review controls so they do not overlap. Move review guidance, connection setup, file limits and undo explanations into optional help; omit attachment counts on empty drafts. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+
 - Center selection checkboxes within mail cards and wrap bulk counts, sync waits and actions to keep every control reachable. Sent-only selections show only Pin, Unpin and Move to Trash. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 
 - Give phone and tablet mail the available reading width, keep every Inbox category reachable through a compact picker, and use readable cards in both density settings. Phone cards use smaller outer gaps without shifting text during selection. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))

@@ -197,6 +197,9 @@ authority. Source version metadata does not establish installer acceptance.
 
 ## Responsiveness and composition
 
+Composer file limits and undo guidance use closed disclosures. Empty drafts omit
+the attachment count; selected files retain their count, size and removal controls.
+
 Gmail and Calendar share `server/google-api.ts`, which imports their specific
 installed Google API modules. Tests mock this same facade; no other API clients
 are loaded at service startup. Account sync captures account-scoped summaries
@@ -2865,6 +2868,9 @@ behavior. Live browser testing remains restricted by PRODUCT.md.
 ### Mobile browser layout
 
 Below 760px, Settings uses a native section picker while desktop retains the section rail. The picker uses the existing section navigation and save guards. Mobile Settings fills the available viewport, descriptions wrap, and form text remains at least 16px. Reply context stacks above the editor and remains independently scrollable. Touch controls, including the primary New Message action, target 44px and respect browser safe areas. Responsive CSS loads after application styles so compact desktop rules cannot override these sizes. The viewport requests content resizing for supported Android keyboards. `src/navigation.test.tsx` covers the phone picker, drawer and theme persistence with synthetic state; actual keyboard and screen geometry require device verification.
+
+Phone Contacts uses content-sized navigation rows so the section picker cannot consume the empty viewport. Labeled Settings switches keep their horizontal track inside the touch-sized row. Phone accent choices keep 32px circular targets and wrap when needed. Work header controls wrap separately from Agent review tabs. Review guidance is collapsed under About review and permissions; Google connection and sorting disclosures appear inside their setup section before its fields.
+
 
 Changelog and release notes follow [CONTRIBUTING.md](../CONTRIBUTING.md#changelog-and-release-notes). Versioned entries identify release changes; [legacy development notes](changelog-legacy.md) preserve the earlier unversioned history. The release owner verifies the published body matches the version section before declaring publication complete.
 

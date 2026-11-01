@@ -836,8 +836,20 @@ test("templates keep source subjects private and date controls concise",async()=
  }finally{await ui.close();}
 });
 
-for(const [mode,purpose] of [["actions","open tasks"],["calendar","Events, tracked work, follow-ups and snoozed mail"],["agents","Review changes before they run"]] as const)test(`${mode} explains its purpose`,async()=>{
- const ui=await mount(mode);try{if(mode==="actions")assert.equal(ui.container.querySelectorAll(".main-head .work-view-tabs button").length,3);else assert.ok(ui.container.textContent?.includes(purpose));assert.equal(ui.requests.some(request=>request.method!=="GET"),false);}finally{await ui.close();}
+for(const mode of ["actions", "calendar", "agents"] as const)test(`${mode} keeps its controls without an explanatory header`,async()=>{
+ const ui=await mount(mode);try{
+  assert.equal(ui.container.querySelector(".work-intro"),null);
+  assert.ok(ui.button("Refresh workspace"));
+  if(mode==="actions")assert.equal(ui.container.querySelectorAll(".main-head .work-view-tabs button").length,3);
+  if(mode==="calendar")assert.ok(ui.button("New event"));
+  if(mode==="agents"){
+   const help=ui.container.querySelector<HTMLDetailsElement>(".agent-review-help")!;
+   assert.ok(help);assert.equal(help.open,false);
+   assert.ok(help.textContent?.includes("Review the account, target and exact action"));
+   assert.equal(ui.container.querySelector(".agent-review-context"),null);
+  }
+  assert.equal(ui.requests.some(request=>request.method!=="GET"),false);
+ }finally{await ui.close();}
 });
 
 test("agent sections preserve setup entries and presets never add immediate creation rights", async () => {

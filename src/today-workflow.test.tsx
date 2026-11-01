@@ -408,7 +408,7 @@ test("due counts share account scope across views and exclude cleared, completed
     ui.failRead(false); await ui.refresh(); assert.equal(ui.sidebar("Today").getAttribute("aria-label"), "Today, 1 due follow-ups");
     await ui.click(ui.sidebar("All accounts")); assert.equal(ui.sidebar("Today").getAttribute("aria-label"), "Today, 2 due follow-ups");
     await ui.click(ui.sidebar("Calendar")); assert.ok(ui.container.querySelector('section[aria-label="Calendar"]'));
-    await ui.click(ui.sidebar("Agent review")); assert.ok(ui.container.textContent?.includes("Review changes before they run"));
+    await ui.click(ui.sidebar("Agent review")); assert.ok(ui.container.querySelector(".agent-navigation"));
     assert.equal(ui.requests.some((call) => call.method !== "GET" && call.url !== "/sync"), false);
   } finally { await ui.close(); }
 });

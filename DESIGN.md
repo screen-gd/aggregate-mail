@@ -71,8 +71,8 @@ Today has a workspace context pane before selection. Projects has an overview
 above tasks and conversations, with project decisions in its context pane.
 Opening a source retains the existing inline reader and return behavior.
 Calendar places the selected day agenda beside the month when space permits.
-Agent review separates exact proposals from review context and permission
-management. Settings keeps its own section rail. Dialogs share
+Agent review keeps exact proposals in the main column, with optional review
+and permission guidance in a closed disclosure. Settings keeps its own section rail. Dialogs share
 the same compact type, grouped forms and footer actions.
 
 ## Frontend rebuild

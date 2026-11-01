@@ -77,7 +77,14 @@ test("practical selections upload raw files serially and keep only IDs in the dr
   try {
     await act(async () => root.render(<ComposePanel draft={draft} api={api} setDraft={value => { changed = value; }} accounts={[{ id: draft.accountId, email: "sender@example.test", provider: "imap" }]}
       busy={false} onClose={() => {}} onDiscard={() => {}} onRetry={() => {}} onSaveCopy={() => {}} onSend={() => assert.fail("Selecting cannot send")}
+      onUndoDelay={() => assert.fail("Rendering cannot change the undo delay")}
       onAttachmentTask={value => { task = value; }} progress={{ phase: "saved", message: "Saved" }} />));
+    assert.equal(document.querySelector(".compose-attachment-size"), null, "empty drafts omit the attachment count");
+    const limits = document.getElementById("compose-attachment-limits")!.closest("details")!;
+    assert.equal(limits.open, false, "attachment guidance starts collapsed");
+    const undo = document.querySelector<HTMLDetailsElement>(".compose-undo-delay details")!;
+    assert.equal(undo.open, false);
+    assert.match(undo.textContent!, /No recall after acceptance/);
     const files = Array.from({ length: 20 }, (_, i) => new dom.window.File([new Uint8Array(1024 * 1024)], `${i}.bin`, { type: "application/octet-stream" }));
     const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
     Object.defineProperty(input, "files", { configurable: true, value: files });
