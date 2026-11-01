@@ -3,8 +3,9 @@
 // low-frequency wave drifts the light, fine film grain and a soft vignette
 // sit on top. The hero adds a slow domain-warped fractal tinted in the page
 // palette. No libraries; the canvas fades in over the painting's CSS
-// fallback once the first frame has drawn. On touch screens and viewports
-// <= 760px only that one still frame ever draws — the loop never starts.
+// fallback once the first frame has drawn. The breathe runs only while a
+// fine-pointer screen wider than 760px asks for it — reduced motion,
+// touch and small windows keep that one still frame.
 
 /* v runs top-down to match the DOM image and the upload: the texture is
    written in image row order (ImageBitmap uploads ignore UNPACK_FLIP_Y
@@ -525,12 +526,12 @@ export function startPaintShader(
     }
   })();
 
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return state; // the still frame from onload is enough
+
   /* the breathe is a fine-pointer, wide-screen detail: touch and small
-     screens get the same still frame as reduced motion and run no loop */
-  const reduced =
-    matchMedia("(prefers-reduced-motion: reduce)").matches ||
-    matchMedia("(pointer: coarse), (max-width: 760px)").matches;
-  if (reduced) return state; // the still frame from onload is enough
+     screens keep the still frame and run no loop, and the loop starts or
+     stops when a resize or input change crosses that line */
+  const breathe = matchMedia("(pointer: fine) and (min-width: 761px)");
 
   /* ~20fps while in view — the breathe is slow, and each draw also costs
      a masked re-composite of the painting layer; the rAF loop stops
@@ -546,7 +547,7 @@ export function startPaintShader(
     draw();
   };
   const sync = () => {
-    const run = inView && !document.hidden;
+    const run = breathe.matches && inView && !document.hidden;
     if (run && !raf) {
       lastFrame = 0;
       raf = requestAnimationFrame(loop);
@@ -560,6 +561,7 @@ export function startPaintShader(
     sync();
   }).observe(container);
   document.addEventListener("visibilitychange", sync);
+  breathe.addEventListener("change", sync);
   sync();
 
   return state;
