@@ -114,6 +114,15 @@ recovery, search, rich composition, attachments, browser protection and update
 status. Saved themes and glass remain available. Responsive rules load last
 and retain touch targets, safe areas, focus, reduced motion and keyboard access.
 
+## Brand assets
+
+Use the curved Emc² mark and outlined wordmark assets in `public/brand`.
+The sidebar uses the Mass wordmark on light surfaces and Lumen on dark surfaces.
+Browser sign-in and pairing use the full horizontal lockup in the corresponding
+system appearance. Keep each asset's proportions. The default app icon is the
+Lumen mark on the dark Mass tile; desktop icon formats and browser shortcut icons
+use the same artwork. Existing theme and accent choices retain their controls.
+
 ## Shared controls
 
 The revised shell shows the current view in the top toolbar beside history

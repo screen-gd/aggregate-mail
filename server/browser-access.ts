@@ -147,7 +147,7 @@ ${unlocked ? '<p><a class="primary" href="/">Open inbox</a></p>' : '<label for="
       "Cache-Control": "no-store",
       "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+      "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
     });
     const requestOrigin = originFor(req);
     res.set("X-Emc2-Browser", "1");
@@ -158,6 +158,9 @@ ${unlocked ? '<p><a class="primary" href="/">Open inbox</a></p>' : '<label for="
     next();
   });
   router.get("/auth/style.css", (_req, res) => res.type("css").send(browserAuthStyles));
+  // These fixed application-brand assets are public; other static files keep the gate.
+  router.get(["/brand/lockup-mass.svg", "/brand/lockup-lumen.svg", "/brand/wordmark-mass.svg", "/brand/wordmark-lumen.svg", "/brand/icon-192.png", "/brand/apple-touch-icon.png"], (req, res) =>
+    res.sendFile(path.basename(req.path), { root: path.resolve(process.env.MAIL_STATIC_DIR || "dist", "brand") }));
   router.use(authRouter);
   router.get("/auth/session", (req, res) => {
     const admitted = authenticated(req, false);

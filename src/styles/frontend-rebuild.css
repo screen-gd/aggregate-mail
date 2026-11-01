@@ -27,6 +27,10 @@
 .sidebar-head { gap: 8px; padding-inline: 12px; justify-content: flex-end; }
 .sidebar-head > .icon:first-child { margin-left: 0; order: 2; }
 .sidebar-head .sidebar-brand { margin-right: auto; font-size: 13px; font-weight: 600; }
+.sidebar-brand { display: inline-flex; flex-shrink: 0; }
+.sidebar-brand img { width: 64px; height: 22px; object-fit: contain; }
+.sidebar-brand .brand-dark, :root[data-scheme="dark"] .sidebar-brand .brand-light { display: none; }
+:root[data-scheme="dark"] .sidebar-brand .brand-dark { display: block; }
 @media (width >= 760px) {
   .app:not(.desktop) :is(.sidebar-head, .app-toolbar) { height: 40px; }
   .app:not(.desktop) .dialog-backdrop.compose-backdrop { inset: 40px 0 0; padding: 0; }

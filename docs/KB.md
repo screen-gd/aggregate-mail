@@ -3472,3 +3472,21 @@ using 8px list edges, a 24px avatar and an 8px avatar gap.
 `src/navigation.test.tsx` covers tablet reading, category filtering and compact
 phone cards. List windowing, row actions, selection and stylesheet tests cover
 the shared geometry. See [ADR 0113](adr/0113-responsive-mail-layout.md).
+
+### Application branding assets
+
+`public/brand` holds the Mass/Lumen wordmarks and horizontal lockups, the 192px
+browser icon and the 180px Apple touch icon. Vite copies these production assets
+to `dist/brand`. The sidebar switches wordmarks with the resolved app scheme;
+public browser-access pages select the lockup using system color scheme.
+`build/icon.png` is the 1024px default dark app icon. `build/icon.ico` contains
+16, 24, 32, 48, 64, 128 and 256px representations; `build/icon.icns` contains the
+macOS representations. The tray asset uses the same artwork. No app identifier,
+profile, keychain, signing or release behavior changes with these assets.
+
+The browser gate serves only the six named brand files before authentication,
+with existing origin checks and no-store responses. Its authentication-page CSP
+allows same-origin images. Other asset paths and mailbox APIs remain protected.
+`server/browser-access.test.ts` covers this boundary, including unlisted files,
+traversal attempts and foreign origins. Native installed icon appearance and
+home-screen icon caching require separate device verification.

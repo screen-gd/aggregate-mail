@@ -102,7 +102,10 @@ export function Sidebar({
           <SidebarIcon color="currentColor" size={16} />
         </button>
         {corner === "left" && <TrafficLights maximized={maximized} />}
-        <span className="sidebar-brand">Emc²</span>
+        <span className="sidebar-brand" role="img" aria-label="Emc²">
+          <img className="brand-light" src="/brand/wordmark-mass.svg" alt="" />
+          <img className="brand-dark" src="/brand/wordmark-lumen.svg" alt="" />
+        </span>
       </div>
         <div className="sidebar-content" key="mail" inert={mail.blocked}>
           <SlidingNav activeKey={null} label="App" className="sidebar-group sidebar-primary">
