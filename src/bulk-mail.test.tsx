@@ -6,12 +6,13 @@ import type { Mail } from "../shared/types";
 import type { Api } from "./api";
 import { BulkMailSelection } from "./mail/BulkMailSelection";
 import { MailList } from "./mail/MailList";
+import { NotificationContext } from "./ui/Toasts";
 
 const messages: Mail[] = Array.from({ length: 250 }, (_, index) => ({ id: `local-${index}`, accountId: index % 2 ? "b" : "a", remoteId: String(index),
   sender: "Synthetic", address: "sender@example.test", to: "reader@example.test", subject: `Subject ${index}`,
   body: "", preview: "", date: 1, unread: true, archived: false, category: "important", relevance: 2, reason: "", snoozedUntil: null }));
 const noop = () => {};
-async function mount(api: Api = async <T,>() => ({ results: [] } as T), reload = async () => {}, selectionShortcut?: (event: KeyboardEvent) => "toggle" | "range" | null, syncing = false) {
+async function mount(api: Api = async <T,>() => ({ results: [] } as T), reload = async () => {}, selectionShortcut?: (event: KeyboardEvent) => "toggle" | "range" | null, syncing = false, push: ((text: string, kind?: "info" | "success" | "error") => void) | null = null) {
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: "http://localhost/" });
   const previous = new Map<string, PropertyDescriptor | undefined>();
   for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true })) {
@@ -22,16 +23,16 @@ async function mount(api: Api = async <T,>() => ({ results: [] } as T), reload =
   const root = createRoot(document.getElementById("root")!);
   const ref = createRef<HTMLDivElement>();
   let opened = 0;
-  function Harness({ items, scope }: { items: Mail[]; scope: string }) {
+  function Harness({ items, scope, active }: { items: Mail[]; scope: string; active: boolean }) {
     const [cursor, setCursor] = useState(items[0]?.id);
-    return <div ref={ref} className="list"><BulkMailSelection messages={items} accounts={[
+    return <NotificationContext.Provider value={push}><div ref={ref} className="list"><BulkMailSelection active={active} messages={items} accounts={[
       { id: "a", email: "a@example.test", provider: "imap" }, { id: "b", email: "b@example.test", provider: "imap" },
     ]} scope={scope} selectedId={cursor} onSelect={setCursor} api={api} reload={reload} disabled={false} syncing={syncing} onBlockingChange={noop} selectionShortcut={selectionShortcut}>
       <MailList messages={items} accounts={[]} listRef={ref} selectedId={cursor} focusSelection={true} density="comfortable" narrow={false} sort="relevance"
         opening="single" onSelect={setCursor} onOpen={() => { opened++; }} onMenu={noop} onMenuKey={noop} />
-    </BulkMailSelection></div>;
+    </BulkMailSelection></div></NotificationContext.Provider>;
   }
-  const render = async (items = messages, scope = "inbox") => act(async () => root.render(<Harness items={items} scope={scope} />));
+  const render = async (items = messages, scope = "inbox", active = true) => act(async () => root.render(<Harness items={items} scope={scope} active={active} />));
   await render();
   const button = (text: string) => [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === text)!;
   const click = async (text: string) => act(async () => button(text).click());
@@ -113,6 +114,21 @@ test("response loss marks every item unknown and cache refresh failure does not 
     assert.match(document.querySelector('.bulk-result')!.textContent!, /Refreshing mail failed/);
     assert.match(ui.count()!, /^0 messages selected/);
     await ui.click("Dismiss results"); assert.equal(calls, 1);
+  } finally { await ui.close(); }
+});
+
+test("a bulk success toast is published once per action and not replayed when a message closes", async () => {
+  const toasts: string[] = [];
+  const ok: Api = async <T,>(_path: string, _method?: string, body?: unknown) =>
+    ({ results: (body as { items: Mail[] }).items.map(item => ({ ...item, status: "done" })) } as T);
+  const ui = await mount(ok, async () => {}, undefined, false, (text, kind) => { if (kind === "success") toasts.push(text); });
+  try {
+    await ui.render(messages.slice(0, 3)); await act(async () => ui.master().click()); await ui.click("Done");
+    assert.deepEqual(toasts, ["3 messages updated."]);
+    await ui.render(messages.slice(0, 3), "inbox", false); await ui.render(messages.slice(0, 3), "inbox", true);
+    assert.deepEqual(toasts, ["3 messages updated."], "closing a message does not repeat the toast");
+    await act(async () => ui.master().click()); await ui.click("Done");
+    assert.deepEqual(toasts, ["3 messages updated.", "3 messages updated."], "an equal-sized second action still confirms");
   } finally { await ui.close(); }
 });
 

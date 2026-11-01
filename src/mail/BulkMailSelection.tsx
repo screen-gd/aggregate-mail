@@ -1,4 +1,4 @@
-import { Notice } from "../ui/Toasts";
+import { Notice, NotificationContext } from "../ui/Toasts";
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Account, RendererMail } from "../../shared/types";
 import { MAX_MAIL_BATCH, type BulkMailAction, type MailBatchResponse, type MailBatchResult, type MailIdentity } from "../../shared/bulk-mail";
@@ -25,6 +25,11 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
 }) {
   const [selection, setSelection] = useState<{ scope: string; items: MailIdentity[] }>({ scope, items: [] });
   const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const push = useContext(NotificationContext);
+  const succeeded = !!outcome && !outcome.refreshFailed && outcome.results.every(item => item.status === "done");
+  // The success Notice publishes its toast in its own effect, which runs first.
+  // Clearing afterwards stops a remount, such as closing a message, from repeating it.
+  useEffect(() => { if (active && succeeded && push) setOutcome(null); }, [active, succeeded, push]);
   const [confirmation, setConfirmation] = useState<MailIdentity[] | null>(null);
   const [snoozing, setSnoozing] = useState(false);
   const [pending, setPending] = useState(false);
@@ -104,7 +109,7 @@ export function BulkMailSelection({ messages, accounts, scope, selectedId, onSel
   }, [active]);
   const execute = async (action: BulkMailAction, submitted = items, until?: number) => {
     if (lock.current || disabled || syncing || !submitted.length) return;
-    lock.current = true; setPending(true); setConfirmation(null); setSnoozing(false); clear();
+    lock.current = true; setPending(true); setOutcome(null); setConfirmation(null); setSnoozing(false); clear();
     let results: MailBatchResult[];
     try {
       const response = await api<MailBatchResponse>("/messages/batch", "POST", { items: submitted, operation: { action, ...(until ? { until } : {}) } });

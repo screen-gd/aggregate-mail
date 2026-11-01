@@ -21,7 +21,7 @@ export function NotificationProvider({ push, children }: { push: NonNullable<Rea
     return () => setHosts(current => current.filter(value => value !== host));
   }, []);
   return <NotificationContext.Provider value={push}><NotificationHostContext.Provider value={register}>
-    <NotificationTargetContext.Provider value={hosts.toSorted((a, b) => a.compareDocumentPosition(b) & 4 ? -1 : 1).at(-1) ?? null}>{children}</NotificationTargetContext.Provider>
+    <NotificationTargetContext.Provider value={[...hosts].sort((a, b) => a.compareDocumentPosition(b) & 4 ? -1 : 1).at(-1) ?? null}>{children}</NotificationTargetContext.Provider>
   </NotificationHostContext.Provider></NotificationContext.Provider>;
 }
 
