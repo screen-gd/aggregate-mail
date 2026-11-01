@@ -139,6 +139,39 @@ test("encrypted workspace backup and non-destructive restore, synthetic only", {
     store.remove("commitment", "c");
     store.remove("account", "prefix");
   });
+  await t.test("reordered accounts keep the first listed prefix", () => {
+    store.remove("commitment", "c");
+    store.put("account", "prefix", { id: "prefix", email: "prefix@example.test", provider: "imap", credentials: {} });
+    const reordered = structuredClone(payload);
+    reordered.accounts = [
+      { id: "a", email: synthetic.email, provider: "imap" },
+      { id: "a:b", email: "prefix@example.test", provider: "imap" },
+    ];
+    const row = reordered.records.find(candidate => candidate.kind === "commitment")!;
+    row.value = { ...(row.value as object), sourceMailId: "a:b:1", evidenceMailIds: ["a:b:1"] };
+    backup.mergeBackup(reordered, true);
+    assert.equal(store.get("commitment", "c")!.sourceMailId, "b:b:1");
+    assert.deepEqual(store.get("commitment", "c")!.evidenceMailIds, ["b:b:1"]);
+    store.remove("commitment", "c");
+    store.remove("account", "prefix");
+  });
+  await t.test("Unicode prefixes remap and unknown references stay unchanged", () => {
+    store.remove("commitment", "c");
+    store.put("account", "unicode", { id: "unicode", email: "unicode@example.test", provider: "imap", credentials: {} });
+    const unicode = structuredClone(payload);
+    unicode.accounts = [
+      { id: "a", email: synthetic.email, provider: "imap" },
+      { id: "méil", email: "unicode@example.test", provider: "imap" },
+    ];
+    const row = unicode.records.find(candidate => candidate.kind === "commitment")!;
+    row.value = { ...(row.value as object), sourceMailId: "méil:7", evidenceMailIds: ["méil:7", "unknown:9"] };
+    backup.mergeBackup(unicode, true);
+    const saved = store.get("commitment", "c")!;
+    assert.equal(saved.sourceMailId, "unicode:7");
+    assert.deepEqual(saved.evidenceMailIds, ["unicode:7", "unknown:9"]);
+    store.remove("commitment", "c");
+    store.remove("account", "unicode");
+  });
   await t.test("oversized identifiers fail before prefix work becomes unbounded", () => {
     const wide = structuredClone(payload);
     wide.accounts = Array.from({ length: 101 }, (_, index) => ({
