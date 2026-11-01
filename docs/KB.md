@@ -3477,7 +3477,8 @@ the shared geometry. See [ADR 0113](adr/0113-responsive-mail-layout.md).
 
 `public/brand` holds the Mass/Lumen wordmarks and horizontal lockups, the 192px
 browser icon and the 180px Apple touch icon. Vite copies these production assets
-to `dist/brand`. The sidebar switches wordmarks with the resolved app scheme;
+to `dist/brand`. The sidebar switches full horizontal lockups, including the
+symbol, with the resolved app scheme and scales them to fit window controls;
 public browser-access pages select the lockup using system color scheme.
 `build/icon.png` is the 1024px default dark app icon. `build/icon.ico` contains
 16, 24, 32, 48, 64, 128 and 256px representations; `build/icon.icns` contains the

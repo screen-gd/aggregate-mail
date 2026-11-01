@@ -117,7 +117,9 @@ and retain touch targets, safe areas, focus, reduced motion and keyboard access.
 ## Brand assets
 
 Use the curved Emc² mark and outlined wordmark assets in `public/brand`.
-The sidebar uses the Mass wordmark on light surfaces and Lumen on dark surfaces.
+The sidebar uses the full horizontal logo, including the curved symbol, in Mass
+on light surfaces and Lumen on dark surfaces. It fits a 94px by 24px box and
+shrinks proportionally when window controls need room.
 Browser sign-in and pairing use the full horizontal lockup in the corresponding
 system appearance. Keep each asset's proportions. The default app icon is the
 Lumen mark on the dark Mass tile; desktop icon formats and browser shortcut icons

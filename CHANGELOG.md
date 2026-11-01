@@ -21,7 +21,7 @@ unversioned history without treating it as a release record.
 ### Changed
 
 - Use the closing brand image for website link previews, replacing the old inbox screenshot with the Emc² logo and “Email at the speed of light. Inbox, weightless.” ([#190](https://github.com/collection-of-things/aggregate-mail/pull/190))
-- Use the new Emc² wordmark, sign-in logo and app icon across the application, browser shortcuts and desktop icon formats. Light and dark logos follow the interface appearance. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
+- Use the full Emc² logo, including its symbol, in the sidebar and sign-in pages, with matching app icons for browser shortcuts and desktop icon formats. Light and dark logos follow the interface appearance. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 
 - Fit mail cards and notifications to their visible details, tighten Today, Projects, drafts and Settings spacing, and keep short confirmation messages and Undo together. ([#187](https://github.com/collection-of-things/aggregate-mail/pull/187))
 
