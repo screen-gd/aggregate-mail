@@ -526,11 +526,11 @@ export function startPaintShader(
     }
   })();
 
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return state; // the still frame from onload is enough
-
-  /* the breathe is a fine-pointer, wide-screen detail: touch and small
-     screens keep the still frame and run no loop, and the loop starts or
-     stops when a resize or input change crosses that line */
+  /* the breathe is a fine-pointer, wide-screen detail: reduced motion,
+     touch and small screens keep the still frame from onload and run no
+     loop, and the loop starts or stops when a resize, input or motion
+     preference change crosses that line */
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   const breathe = matchMedia("(pointer: fine) and (min-width: 761px)");
 
   /* ~20fps while in view — the breathe is slow, and each draw also costs
@@ -547,7 +547,7 @@ export function startPaintShader(
     draw();
   };
   const sync = () => {
-    const run = breathe.matches && inView && !document.hidden;
+    const run = !reduced.matches && breathe.matches && inView && !document.hidden;
     if (run && !raf) {
       lastFrame = 0;
       raf = requestAnimationFrame(loop);
@@ -562,6 +562,7 @@ export function startPaintShader(
   }).observe(container);
   document.addEventListener("visibilitychange", sync);
   breathe.addEventListener("change", sync);
+  reduced.addEventListener("change", sync);
   sync();
 
   return state;
