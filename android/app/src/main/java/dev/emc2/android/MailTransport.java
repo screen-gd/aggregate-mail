@@ -17,6 +17,12 @@ import java.util.Properties;
 final class MailTransport {
     /** A literal announcement larger than this is rejected before allocation. */
     private static final int MAX_LITERAL = 1048576;
+    /**
+     * JavaMail sizes its message cache from the server's EXISTS count while the
+     * folder opens. Reject an announcement above this before that allocation,
+     * including unsolicited updates after opening.
+     */
+    static final int MAX_SERVER_MESSAGES = 100_000;
 
     /**
      * Aborts a connection when the wire announces an oversized IMAP literal,
@@ -31,6 +37,8 @@ final class MailTransport {
         private long remaining;
         private boolean big;
         private int digits, responseBytes;
+        private int existsState, existsDigits, existsWord;
+        private long announced;
         LiteralGuardInputStream(InputStream inner) { this.inner = inner; }
         @Override public int read() throws java.io.IOException {
             int value = inner.read();
@@ -66,10 +74,56 @@ final class MailTransport {
                 }
             } else if (state == 4) {
                 state = 0;
-                if (b == '\n') { remaining = size; return; }
+                if (b == '\n') { remaining = size; existsState = -1; return; }
             }
+            if (state == 0) exists(b);
             if (b == '\n') responseBytes = 0;
             if (b == '{') { state = 1; size = 0; big = false; digits = 0; }
+        }
+
+        /**
+         * Recognizes `* &lt;n&gt; EXISTS` at the start of an untagged response.
+         * Literal payloads never reach this method, so message content cannot
+         * fake or trip the bound.
+         */
+        private void exists(byte b) throws java.io.IOException {
+            switch (existsState) {
+                case 0:
+                    existsState = b == '*' ? 1 : b == '\n' ? 0 : -1;
+                    return;
+                case 1:
+                    existsState = b == ' ' ? 2 : -1;
+                    return;
+                case 2:
+                    if (b < '0' || b > '9') { existsState = -1; return; }
+                    existsState = 3; existsDigits = 1; announced = b - '0';
+                    return;
+                case 3:
+                    if (b >= '0' && b <= '9') {
+                        if (++existsDigits > 10) throw new java.io.IOException("Unsupported mailbox size announcement.");
+                        announced = announced * 10 + (b - '0');
+                        if (announced > MAX_SERVER_MESSAGES) throw new java.io.IOException("Mail server announced too many messages.");
+                        return;
+                    }
+                    if (b == ' ') { existsState = 4; existsWord = 0; return; }
+                    existsState = -1;
+                    return;
+                case 4:
+                    if (b == "EXISTS".charAt(existsWord)) {
+                        if (++existsWord == 6) existsState = 5;
+                        return;
+                    }
+                    existsState = -1;
+                    return;
+                case 5:
+                    existsState = b == '\r' ? 6 : -1;
+                    return;
+                case 6:
+                    existsState = b == '\n' ? 0 : -1;
+                    return;
+                default:
+                    if (b == '\n') existsState = 0;
+            }
         }
     }
 

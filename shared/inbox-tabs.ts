@@ -15,8 +15,22 @@ export type InboxTab = (typeof inboxTabs)[number]["id"];
 type Classified = RuleMail & Pick<Mail, "sender" | "reason" | "labelIds">;
 
 // Codes, sign-in and security notices, support threads and replies always need the user.
-const personal = /verification|verify|one[- ]time|\botp\b|passcode|security (alert|code|notice)|new sign[- ]?in|(sign[- ]?in|log[- ]?in) (attempt|alert|code|link|request)|(reset|change|forgot)\w* (your )?password|password (reset|change)|two[- ]factor|\b2fa\b|support (ticket|request|case)|\bticket\s*#|\bcase\s*#|^(re|fwd?):/i;
+// The password-notice alternatives are matched by a bounded scan below, so a
+// long subject cannot rescan overlapping word runs on every candidate start.
+const personal = /verification|verify|one[- ]time|\botp\b|passcode|security (alert|code|notice)|new sign[- ]?in|(sign[- ]?in|log[- ]?in) (attempt|alert|code|link|request)|two[- ]factor|\b2fa\b|support (ticket|request|case)|\bticket\s*#|\bcase\s*#|^(re|fwd?):/i;
+// Heuristics only read this much of a subject or preview; display keeps all of it.
+const classifyTextLimit = 4096;
 const digit = (value: string, at: number) => value.charCodeAt(at) >= 48 && value.charCodeAt(at) <= 57;
+// `(reset|change|forgot)\w* (your )?password` and `password (reset|change)` in
+// linear time: each "password" occurrence inspects one bounded window.
+const passwordNotice = (value: string) => {
+  const text = value.toLowerCase();
+  for (let at = text.indexOf("password"); at >= 0; at = text.indexOf("password", at + 8)) {
+    if (/\b(?:reset|change|forgot)\w{0,24}\s+(?:your\s+)?$/.test(text.slice(Math.max(0, at - 48), at))) return true;
+    if (/^\s+(?:reset|change)\b/.test(text.slice(at + 8, at + 24))) return true;
+  }
+  return false;
+};
 // A "code" word within 20 non-period characters of a 4+ digit run, either
 // direction. The overlapping expressions rescanned every digit run once per
 // start position; scanning each word boundary stays linear.
@@ -77,15 +91,16 @@ const updates = /notification|alert|reminder|update|status|activity|job alert|ne
 export function inboxTab(mail: Classified, rules: (RuleMatch & Pick<Rule, "category">)[] = []): InboxTab {
   const address = mail.address.toLowerCase();
   if (matchingRule(mail, rules)?.category === "important") return "primary";
-  const text = `${mail.subject} ${mail.preview}`;
-  if (personal.test(mail.subject) || personal.test(text) || codeNearDigits(mail.subject) || codeNearDigits(text)) return "primary";
+  const subject = mail.subject.slice(0, classifyTextLimit);
+  const text = `${subject} ${mail.preview}`.slice(0, classifyTextLimit);
+  if (personal.test(subject) || personal.test(text) || passwordNotice(subject) || passwordNotice(text) || codeNearDigits(subject) || codeNearDigits(text)) return "primary";
   for (const id of mail.labelIds || []) if (gmailCategories[id]) return gmailCategories[id];
   if (reasonTabs[mail.reason]) return reasonTabs[mail.reason];
   if (transactions.test(text)) return "transactions";
   if (socialSenders.test(address) || social.test(text)) return "social";
-  if (newsletterSenders.test(address) || newsletters.test(mail.subject)) return "newsletters";
+  if (newsletterSenders.test(address) || newsletters.test(subject)) return "newsletters";
   if (promotions.test(text)) return "promotions";
-  if (automatedSenders.test(address) || updates.test(mail.subject)) return "updates";
+  if (automatedSenders.test(address) || updates.test(subject)) return "updates";
   if (/newsletter or promotion/i.test(mail.reason)) return "newsletters";
   return "primary";
 }

@@ -3354,7 +3354,16 @@ Decision-model endpoints require HTTPS, except for localhost, 127.0.0.1 and
 IPv6 loopback. Redirects are rejected. Inherited decision-model credentials
 cannot cross providers through saved settings; change the launch provider and
 credential together. Startup rejects a saved provider that would reuse an
-inherited credential for another vendor.
+inherited credential for another vendor. A saved key keeps the provider it was
+saved with: a replacement key is accepted only when the requested provider and
+the provider selected after launch precedence agree, and loading a saved key
+under a conflicting inherited provider fails before any request.
+
+Workspace backups resolve account prefixes with a trie, so each mail reference
+is scanned once, and an aggregate reference-character budget bounds the
+synchronous remap. Inbox classification reads at most 4096 characters and
+matches password notices with a bounded window instead of an overlapping
+expression; display keeps the complete subject.
 
 Calendar sender fields are unverified. Updating an existing local event from
 an invitation requires reviewing the current event and incoming changes, then

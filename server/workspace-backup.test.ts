@@ -123,6 +123,35 @@ test("encrypted workspace backup and non-destructive restore, synthetic only", {
     store.put("mail", "b:1", { ...store.get("mail", "b:1")!, pinned: false, snoozedUntil: null });
     assert.equal(store.get("mail", "b:1")!.pinned, false, "later local edits preserved");
   });
+  await t.test("account prefix remapping resolves the first listed exact account", () => {
+    store.remove("commitment", "c");
+    store.put("account", "prefix", { id: "prefix", email: "prefix@example.test", provider: "imap", credentials: {} });
+    const ambiguous = structuredClone(payload);
+    ambiguous.accounts = [
+      { id: "a:b", email: "prefix@example.test", provider: "imap" },
+      { id: "a", email: synthetic.email, provider: "imap" },
+    ];
+    const row = ambiguous.records.find(candidate => candidate.kind === "commitment")!;
+    row.value = { ...(row.value as object), sourceMailId: "a:b:1", evidenceMailIds: ["a:b:1"] };
+    backup.mergeBackup(ambiguous, true);
+    assert.equal(store.get("commitment", "c")!.sourceMailId, "prefix:1");
+    assert.deepEqual(store.get("commitment", "c")!.evidenceMailIds, ["prefix:1"]);
+    store.remove("commitment", "c");
+    store.remove("account", "prefix");
+  });
+  await t.test("oversized identifiers fail before prefix work becomes unbounded", () => {
+    const wide = structuredClone(payload);
+    wide.accounts = Array.from({ length: 101 }, (_, index) => ({
+      id: String(index).padStart(3, "0") + "x".repeat(1997),
+      email: `synthetic-${index}@example.test`,
+      provider: "imap" as const,
+    }));
+    assert.throws(() => backup.mergeBackup(wide), /account identifiers exceed/);
+    const many = structuredClone(payload);
+    const project = many.records.find(row => row.kind === "project")!;
+    project.value = { ...(project.value as object), sourceMailIds: Array.from({ length: 5000 }, () => "a:" + "x".repeat(1998)) };
+    assert.throws(() => backup.mergeBackup(many), /references exceed safe limits/);
+  });
   await t.test("write failure rolls back the entire merge", () => {
     store.remove("commitment", "c"); store.remove("project", "p");
     const db = new DatabaseSync(path.join(directory, "mail.sqlite"));

@@ -232,3 +232,43 @@ test("an inherited credential cannot follow a saved provider change", () => {
     `);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
+
+test("a replacement key is saved only with the provider launch precedence selects", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "emc2-config-key-pair-"));
+  try {
+    isolatedConfig(directory, `
+      import assert from 'node:assert/strict';
+      process.env.TYPESAFE_PROVIDER = 'typesafe';
+      const c = await import('./server/config.ts'); const s = await import('./server/store.ts');
+      c.loadConfiguration();
+      assert.throws(() => c.saveConfiguration({ TYPESAFE_PROVIDER: 'vercel', TYPESAFE_API_KEY: 'synthetic-vercel' }), /inherited|launch/i);
+      // A key submitted without a provider is labeled with the launch vendor.
+      c.saveConfiguration({ TYPESAFE_API_KEY: 'synthetic-typesafe' });
+      assert.equal(process.env.TYPESAFE_API_KEY, 'synthetic-typesafe');
+      assert.equal(s.get('config', 'connection').TYPESAFE_PROVIDER, undefined);
+      s.closeStore();
+    `);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("a saved key is never reused under another inherited provider", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "emc2-config-saved-pair-"));
+  try {
+    isolatedConfig(directory, `
+      import assert from 'node:assert/strict';
+      const c = await import('./server/config.ts'); const s = await import('./server/store.ts');
+      c.loadConfiguration();
+      c.saveConfiguration({ TYPESAFE_PROVIDER: 'vercel', TYPESAFE_API_KEY: 'synthetic-vercel' });
+      assert.equal(s.get('config', 'connection').TYPESAFE_API_KEY, 'synthetic-vercel');
+      s.closeStore();
+    `);
+    isolatedConfig(directory, `
+      import assert from 'node:assert/strict';
+      process.env.TYPESAFE_PROVIDER = 'typesafe';
+      const c = await import('./server/config.ts'); const s = await import('./server/store.ts');
+      assert.throws(() => c.loadConfiguration(), /another provider|together/i);
+      assert.equal(process.env.TYPESAFE_API_KEY, undefined);
+      s.closeStore();
+    `);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});

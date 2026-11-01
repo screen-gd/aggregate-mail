@@ -75,9 +75,15 @@ export function loadConfiguration() {
   const saved = get("config", "connection");
   const settings: Settings = { ...saved };
   for (const name of names) if (settings[name] === undefined && legacy.values[name] !== undefined) settings[name] = legacy.values[name];
-  const effectiveProvider = inherited.has("TYPESAFE_PROVIDER") ? process.env.TYPESAFE_PROVIDER : settings.TYPESAFE_PROVIDER ?? legacy.values.TYPESAFE_PROVIDER;
+  const savedProvider = settings.TYPESAFE_PROVIDER ?? legacy.values.TYPESAFE_PROVIDER;
+  const effectiveProvider = inherited.has("TYPESAFE_PROVIDER") ? process.env.TYPESAFE_PROVIDER : savedProvider;
   if (inherited.has("TYPESAFE_API_KEY") && process.env.TYPESAFE_API_KEY && jevProviderOf(effectiveProvider) !== inheritedKeyProvider)
     throw new Error("Change the inherited provider and credential together in the launch environment.");
+  // A saved key keeps the provider identity it was saved with. Reuse under a
+  // different inherited provider would send one vendor's key to another.
+  if (!inherited.has("TYPESAFE_API_KEY") && settings.TYPESAFE_API_KEY &&
+      jevProviderOf(savedProvider) !== jevProviderOf(effectiveProvider))
+    throw new Error("The saved decision-model key belongs to another provider. Change the inherited provider and credential together.");
   if (Object.keys(settings).length && !isDeepStrictEqual(saved, settings)) persist(settings);
   cleanLegacy(legacy.text, cleaned);
   for (const [name, value] of Object.entries({ ...legacy.values, ...settings })) {
@@ -102,10 +108,28 @@ export function saveConfiguration(updates: Settings) {
     jevProviderOf(updates.TYPESAFE_PROVIDER) !== jevProviderOf(previousProvider)
   )
     delete settings.TYPESAFE_API_KEY;
-  const effectiveProvider = inherited.has("TYPESAFE_PROVIDER") ? process.env.TYPESAFE_PROVIDER : settings.TYPESAFE_PROVIDER;
-  if (process.env.TYPESAFE_API_KEY && inherited.has("TYPESAFE_API_KEY") &&
-      jevProviderOf(effectiveProvider) !== jevProviderOf(previousProvider))
+  // Launch precedence decides which vendor is actually used, so the requested
+  // provider and its replacement key are validated together after precedence.
+  const launchProvider = inherited.has("TYPESAFE_PROVIDER") ? process.env.TYPESAFE_PROVIDER : undefined;
+  const savedProvider = settings.TYPESAFE_PROVIDER ?? legacy.values.TYPESAFE_PROVIDER;
+  const effectiveProvider = launchProvider ?? savedProvider;
+  if (launchProvider && updates.TYPESAFE_PROVIDER &&
+      jevProviderOf(updates.TYPESAFE_PROVIDER) !== jevProviderOf(launchProvider))
     throw new Error("Change the inherited provider and credential together in the launch environment.");
+  if (updates.TYPESAFE_API_KEY) {
+    const keyProvider = updates.TYPESAFE_PROVIDER ?? launchProvider ?? savedProvider;
+    if (jevProviderOf(keyProvider) !== jevProviderOf(effectiveProvider))
+      throw new Error("Save the decision-model key with its own provider.");
+  }
+  // An inherited key keeps the provider identity it had in the launch
+  // environment. A saved provider change cannot redirect it to another vendor.
+  if (inherited.has("TYPESAFE_API_KEY") && process.env.TYPESAFE_API_KEY &&
+      jevProviderOf(effectiveProvider) !== inheritedKeyProvider)
+    throw new Error("Change the inherited provider and credential together in the launch environment.");
+  // Persisted keys carry the identity of their saved provider. Refuse to leave
+  // one in place when launch precedence selects another vendor.
+  if (settings.TYPESAFE_API_KEY && jevProviderOf(savedProvider) !== jevProviderOf(effectiveProvider))
+    throw new Error("The saved decision-model key belongs to another provider. Change the inherited provider and credential together.");
   persist(settings);
   cleanLegacy(legacy.text, cleaned);
   for (const name of names) {
