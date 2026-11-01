@@ -12,7 +12,7 @@ unversioned history without treating it as a release record.
 - Require confirmed IMAP identities for archived-message changes, encrypted remote sorting connections, and safe provider/credential pairing. ([#181](https://github.com/collection-of-things/aggregate-mail/pull/181))
 - Review unverified calendar changes against the existing event. Restored drafts must be prepared again before sending calendar data. PDFs remain available to download; in-app PDF preview is disabled until it has a memory bound. ([#181](https://github.com/collection-of-things/aggregate-mail/pull/181))
 - Keep Android mail parsing and TLS checks bounded and fail closed, and protect Send confirmation from screen capture. Isolate bootstrap benchmark authentication and provider settings. ([#181](https://github.com/collection-of-things/aggregate-mail/pull/181))
-- Validate decision-model keys as one pair with the effective provider, resolve backup account prefixes in a single bounded pass, and keep inbox classification linear on hostile subjects. Android now rejects mailbox counts and literal announcements before JavaMail allocates for them.
+- Validate decision-model keys as one pair with the effective provider, resolve backup account prefixes in a single bounded pass, and keep inbox classification linear on hostile subjects. Android now rejects mailbox counts and literal announcements before JavaMail allocates for them. ([#189](https://github.com/collection-of-things/aggregate-mail/pull/189))
 
 ### Changed
 
