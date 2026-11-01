@@ -103,7 +103,7 @@ export function attachFlutedField(): void {
     gl = canvas.getContext("webgl", {
       antialias: false,
       alpha: false,
-      preserveDrawingBuffer: true,
+      preserveDrawingBuffer: false,
     }) as WebGLRenderingContext | null;
   } catch {
     canvas.remove();
@@ -185,6 +185,9 @@ export function attachFlutedField(): void {
   let lastCost = 0;
   /* the scroll position the last paint baked in */
   let paintedScroll = 0;
+  /* the transform string follow() last wrote — writing an unchanged style
+     every rAF frame still costs the compositor a check */
+  let lastTransform = "";
   const paint = () => {
     paintedScroll = reduced ? 0 : scrollY;
     ctx.uniform2f(uRes, canvas.width, canvas.height);
@@ -194,6 +197,7 @@ export function attachFlutedField(): void {
     const t0 = performance.now();
     ctx.drawArrays(ctx.TRIANGLES, 0, 3);
     lastCost = performance.now() - t0;
+    lastTransform = "";
     canvas.style.transform = "";
   };
 
@@ -206,7 +210,10 @@ export function attachFlutedField(): void {
       paint();
       return;
     }
-    canvas.style.transform = shift ? `translate3d(0, ${shift}px, 0)` : "";
+    const next = shift ? `translate3d(0, ${shift}px, 0)` : "";
+    if (next === lastTransform) return;
+    lastTransform = next;
+    canvas.style.transform = next;
   };
   (canvas as unknown as { __frameCost?: () => number }).__frameCost = () => lastCost;
 

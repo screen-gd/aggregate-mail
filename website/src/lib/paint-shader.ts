@@ -3,7 +3,8 @@
 // low-frequency wave drifts the light, fine film grain and a soft vignette
 // sit on top. The hero adds a slow domain-warped fractal tinted in the page
 // palette. No libraries; the canvas fades in over the painting's CSS
-// fallback once the first frame has drawn.
+// fallback once the first frame has drawn. On touch screens and viewports
+// <= 760px only that one still frame ever draws — the loop never starts.
 
 /* v runs top-down to match the DOM image and the upload: the texture is
    written in image row order (ImageBitmap uploads ignore UNPACK_FLIP_Y
@@ -285,9 +286,9 @@ export function startPaintShader(
     gl = canvas.getContext("webgl", {
       antialias: false,
       alpha: false,
-      // keep the last frame in the buffer so compositor snapshots never see a
-      // cleared (black) canvas between a resize and the next rAF paint
-      preserveDrawingBuffer: true,
+      // a resize repaints in the same task, so compositor snapshots never
+      // see a cleared buffer even with the drawing buffer unpreserved
+      preserveDrawingBuffer: false,
     }) as WebGLRenderingContext | null;
   } catch {
     return state;
@@ -326,8 +327,8 @@ export function startPaintShader(
     return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
   };
 
-  /* render at <= 1.5 device pixels */
-  const dpr = () => Math.min(devicePixelRatio || 1, 1.5);
+  /* render at no more than one device pixel */
+  const dpr = () => Math.min(devicePixelRatio || 1, 1);
 
   const quad = ctx.createBuffer();
   ctx.bindBuffer(ctx.ARRAY_BUFFER, quad);
@@ -524,7 +525,11 @@ export function startPaintShader(
     }
   })();
 
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  /* the breathe is a fine-pointer, wide-screen detail: touch and small
+     screens get the same still frame as reduced motion and run no loop */
+  const reduced =
+    matchMedia("(prefers-reduced-motion: reduce)").matches ||
+    matchMedia("(pointer: coarse), (max-width: 760px)").matches;
   if (reduced) return state; // the still frame from onload is enough
 
   /* ~20fps while in view — the breathe is slow, and each draw also costs
