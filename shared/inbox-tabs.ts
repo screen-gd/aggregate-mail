@@ -27,7 +27,9 @@ const passwordNotice = (value: string) => {
   const text = value.toLowerCase();
   for (let at = text.indexOf("password"); at >= 0; at = text.indexOf("password", at + 8)) {
     if (/\b(?:reset|change|forgot)\w{0,24}\s+(?:your\s+)?$/.test(text.slice(Math.max(0, at - 48), at))) return true;
-    if (/^\s+(?:reset|change)\b/.test(text.slice(at + 8, at + 24))) return true;
+    // No trailing boundary: "password changed" and "password changes" are the
+    // same notice as "password change".
+    if (/^\s+(?:reset|change)/.test(text.slice(at + 8, at + 24))) return true;
   }
   return false;
 };

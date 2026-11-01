@@ -84,7 +84,7 @@ function isolatedConfig(directory: string, source: string, prototype?: "ordinary
   assert.equal(child.status, 0, child.stdout + child.stderr);
 }
 
-test("an inherited effective provider keeps its saved key", () => {
+test("a provider save drops a key stored for another vendor even under launch precedence", () => {
   const directory = mkdtempSync(path.join(tmpdir(), "emc2-config-provider-"));
   try {
     isolatedConfig(directory, `
@@ -93,7 +93,79 @@ test("an inherited effective provider keeps its saved key", () => {
       const c = await import('./server/config.ts'); const s = await import('./server/store.ts');
       s.put('config', 'connection', { TYPESAFE_PROVIDER: 'openrouter', TYPESAFE_API_KEY: 'synthetic-key' });
       c.saveConfiguration({ TYPESAFE_PROVIDER: 'vercel' });
-      assert.equal(s.get('config', 'connection').TYPESAFE_API_KEY, 'synthetic-key');
+      assert.equal(s.get('config', 'connection').TYPESAFE_API_KEY, undefined);
+      assert.equal(s.get('config', 'connection').TYPESAFE_PROVIDER, 'vercel');
+      s.closeStore();
+    `);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("a key-only save under an inherited provider stores that provider", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "emc2-config-key-launch-"));
+  try {
+    isolatedConfig(directory, `
+      import assert from 'node:assert/strict';
+      process.env.TYPESAFE_PROVIDER = 'vercel';
+      const c = await import('./server/config.ts'); const s = await import('./server/store.ts');
+      c.loadConfiguration();
+      c.saveConfiguration({ TYPESAFE_API_KEY: 'synthetic-vercel' });
+      const saved = s.get('config', 'connection');
+      assert.equal(saved.TYPESAFE_PROVIDER, 'vercel');
+      assert.equal(saved.TYPESAFE_API_KEY, 'synthetic-vercel');
+      s.closeStore();
+    `);
+    // Without the launch values the key still keeps the vendor it was saved for.
+    isolatedConfig(directory, `
+      import assert from 'node:assert/strict';
+      const c = await import('./server/config.ts'); const s = await import('./server/store.ts');
+      c.loadConfiguration();
+      assert.equal(process.env.TYPESAFE_PROVIDER, 'vercel');
+      assert.equal(process.env.TYPESAFE_API_KEY, 'synthetic-vercel');
+      s.closeStore();
+    `);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("an overriding inherited credential does not block unrelated saves", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "emc2-config-override-"));
+  try {
+    isolatedConfig(directory, `
+      import assert from 'node:assert/strict';
+      process.env.TYPESAFE_PROVIDER = 'typesafe';
+      process.env.TYPESAFE_API_KEY = 'synthetic-inherited';
+      const c = await import('./server/config.ts'); const s = await import('./server/store.ts');
+      c.loadConfiguration();
+      s.put('config', 'connection', { TYPESAFE_PROVIDER: 'vercel', TYPESAFE_API_KEY: 'synthetic-vercel' });
+      c.saveConfiguration({ GOOGLE_CLIENT_SECRET: 'synthetic-google' });
+      const saved = s.get('config', 'connection');
+      assert.equal(saved.GOOGLE_CLIENT_SECRET, 'synthetic-google');
+      assert.equal(saved.TYPESAFE_PROVIDER, 'vercel');
+      assert.equal(saved.TYPESAFE_API_KEY, 'synthetic-vercel');
+      s.closeStore();
+    `);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("a saved key from another vendor is removed by a provider save", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "emc2-config-saved-provider-"));
+  try {
+    isolatedConfig(directory, `
+      import assert from 'node:assert/strict';
+      const c = await import('./server/config.ts'); const s = await import('./server/store.ts');
+      c.loadConfiguration();
+      c.saveConfiguration({ TYPESAFE_PROVIDER: 'openrouter', TYPESAFE_API_KEY: 'synthetic-openrouter' });
+      s.closeStore();
+    `);
+    isolatedConfig(directory, `
+      import assert from 'node:assert/strict';
+      process.env.TYPESAFE_PROVIDER = 'typesafe';
+      process.env.TYPESAFE_API_KEY = 'synthetic-inherited';
+      const c = await import('./server/config.ts'); const s = await import('./server/store.ts');
+      c.loadConfiguration();
+      c.saveConfiguration({ TYPESAFE_PROVIDER: 'typesafe' });
+      const saved = s.get('config', 'connection');
+      assert.equal(saved.TYPESAFE_PROVIDER, 'typesafe');
+      assert.equal(saved.TYPESAFE_API_KEY, undefined);
       s.closeStore();
     `);
   } finally { rmSync(directory, { recursive: true, force: true }); }
@@ -242,10 +314,10 @@ test("a replacement key is saved only with the provider launch precedence select
       const c = await import('./server/config.ts'); const s = await import('./server/store.ts');
       c.loadConfiguration();
       assert.throws(() => c.saveConfiguration({ TYPESAFE_PROVIDER: 'vercel', TYPESAFE_API_KEY: 'synthetic-vercel' }), /inherited|launch/i);
-      // A key submitted without a provider is labeled with the launch vendor.
+      // A key submitted without a provider is stored with the launch vendor.
       c.saveConfiguration({ TYPESAFE_API_KEY: 'synthetic-typesafe' });
       assert.equal(process.env.TYPESAFE_API_KEY, 'synthetic-typesafe');
-      assert.equal(s.get('config', 'connection').TYPESAFE_PROVIDER, undefined);
+      assert.equal(s.get('config', 'connection').TYPESAFE_PROVIDER, 'typesafe');
       s.closeStore();
     `);
   } finally { rmSync(directory, { recursive: true, force: true }); }

@@ -95,40 +95,46 @@ export function saveConfiguration(updates: Settings) {
   const legacy = legacySettings();
   const cleaned = withoutManagedSettings(legacy.text, legacy.values);
   const settings: Settings = { ...get("config", "connection") };
-  const previousProvider = process.env.TYPESAFE_PROVIDER ?? settings.TYPESAFE_PROVIDER ?? legacy.values.TYPESAFE_PROVIDER;
+  // A stored key belongs to the provider stored with it, not to a launch
+  // override. Capture that pairing before the update can replace either part.
+  const storedProvider = settings.TYPESAFE_PROVIDER ?? legacy.values.TYPESAFE_PROVIDER;
+  const launchProvider = inherited.has("TYPESAFE_PROVIDER") ? process.env.TYPESAFE_PROVIDER : undefined;
   for (const name of names) {
     if (settings[name] === undefined && legacy.values[name] !== undefined) settings[name] = legacy.values[name];
     if (updates[name]) settings[name] = updates[name];
   }
-  // A provider change cannot carry the previous vendor's API key; a vendor key
-  // left in place would be sent to the newly selected provider.
+  // A provider change cannot carry a key stored for another vendor; a vendor
+  // key left in place would be sent to the newly selected provider.
   if (
     updates.TYPESAFE_PROVIDER && !updates.TYPESAFE_API_KEY &&
     settings.TYPESAFE_API_KEY !== undefined &&
-    jevProviderOf(updates.TYPESAFE_PROVIDER) !== jevProviderOf(previousProvider)
+    jevProviderOf(updates.TYPESAFE_PROVIDER) !== jevProviderOf(storedProvider)
   )
     delete settings.TYPESAFE_API_KEY;
   // Launch precedence decides which vendor is actually used, so the requested
   // provider and its replacement key are validated together after precedence.
-  const launchProvider = inherited.has("TYPESAFE_PROVIDER") ? process.env.TYPESAFE_PROVIDER : undefined;
   const savedProvider = settings.TYPESAFE_PROVIDER ?? legacy.values.TYPESAFE_PROVIDER;
   const effectiveProvider = launchProvider ?? savedProvider;
   if (launchProvider && updates.TYPESAFE_PROVIDER &&
       jevProviderOf(updates.TYPESAFE_PROVIDER) !== jevProviderOf(launchProvider))
     throw new Error("Change the inherited provider and credential together in the launch environment.");
+  const requestedProvider = updates.TYPESAFE_PROVIDER ?? launchProvider;
   if (updates.TYPESAFE_API_KEY) {
-    const keyProvider = updates.TYPESAFE_PROVIDER ?? launchProvider ?? savedProvider;
-    if (jevProviderOf(keyProvider) !== jevProviderOf(effectiveProvider))
+    if (jevProviderOf(requestedProvider ?? savedProvider) !== jevProviderOf(effectiveProvider))
       throw new Error("Save the decision-model key with its own provider.");
+    // Persist the vendor the key belongs to, so a restart without the launch
+    // values cannot pair the saved key with another provider.
+    if (requestedProvider) settings.TYPESAFE_PROVIDER = requestedProvider;
   }
   // An inherited key keeps the provider identity it had in the launch
   // environment. A saved provider change cannot redirect it to another vendor.
   if (inherited.has("TYPESAFE_API_KEY") && process.env.TYPESAFE_API_KEY &&
       jevProviderOf(effectiveProvider) !== inheritedKeyProvider)
     throw new Error("Change the inherited provider and credential together in the launch environment.");
-  // Persisted keys carry the identity of their saved provider. Refuse to leave
-  // one in place when launch precedence selects another vendor.
-  if (settings.TYPESAFE_API_KEY && jevProviderOf(savedProvider) !== jevProviderOf(effectiveProvider))
+  // A stored key that launch precedence overrides never becomes effective, so
+  // only reject a mismatched stored pair when the saved key would be used.
+  if (!inherited.has("TYPESAFE_API_KEY") && settings.TYPESAFE_API_KEY &&
+      jevProviderOf(settings.TYPESAFE_PROVIDER ?? legacy.values.TYPESAFE_PROVIDER) !== jevProviderOf(effectiveProvider))
     throw new Error("The saved decision-model key belongs to another provider. Change the inherited provider and credential together.");
   persist(settings);
   cleanLegacy(legacy.text, cleaned);

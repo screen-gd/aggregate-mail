@@ -9,7 +9,8 @@ const mail = (patch: Partial<Parameters<typeof inboxTab>[0]>) => ({
 test("codes, security notices, support threads and replies stay in Primary over Gmail's category", () => {
   for (const subject of ["Your verification code is 482913", "Security alert: new sign-in on Windows",
     "Re: Switch my login from GitHub", "Support ticket #4821 updated", "Reset your password",
-    "Change your password soon", "Forgot password?", "Password reset required", "password change notice"])
+    "Change your password soon", "Forgot password?", "Password reset required", "password change notice",
+    "Your password changed", "Your password changes tonight"])
     assert.equal(inboxTab(mail({ subject, labelIds: ["CATEGORY_UPDATES"] })), "primary", subject);
 });
 

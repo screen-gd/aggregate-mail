@@ -3356,8 +3356,11 @@ cannot cross providers through saved settings; change the launch provider and
 credential together. Startup rejects a saved provider that would reuse an
 inherited credential for another vendor. A saved key keeps the provider it was
 saved with: a replacement key is accepted only when the requested provider and
-the provider selected after launch precedence agree, and loading a saved key
-under a conflicting inherited provider fails before any request.
+the provider selected after launch precedence agree, and saving a key under an
+inherited provider persists that provider with the key. A provider save removes
+a key stored for another vendor, and loading a saved key under a conflicting
+inherited provider fails before any request. An overridden saved key does not
+block unrelated settings saves.
 
 Workspace backups resolve account prefixes with a trie, so each mail reference
 is scanned once, and an aggregate reference-character budget bounds the
