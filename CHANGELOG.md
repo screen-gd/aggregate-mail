@@ -6,6 +6,8 @@ unversioned history without treating it as a release record.
 
 ## Unreleased
 
+## 0.2.24 - 2026-11-01
+
 ### Security
 
 - Bound mail formatting and IMAP search processing, reuse conversation work during agent review, and keep notification refreshes independent of message body size. ([#181](https://github.com/collection-of-things/aggregate-mail/pull/181))
